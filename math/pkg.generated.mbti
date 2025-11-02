@@ -1,0 +1,184 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/math"
+
+// Values
+fn cholesky_decomposition(Matrix) -> CholeskyDecomposition
+
+fn correlation(Array[Double], Array[Double]) -> Double
+
+fn cosine_similarity(Array[Double], Array[Double]) -> Double
+
+fn covariance(Array[Double], Array[Double]) -> Double
+
+fn determinant(Matrix) -> Double
+
+fn eigen_decomposition(Matrix, Int, Int, Double) -> EigenDecomposition
+
+fn euclidean_distance(Array[Double], Array[Double]) -> Double
+
+fn inverse(Matrix) -> Matrix
+
+fn iqr(Array[Double]) -> Double
+
+fn kurtosis(Array[Double]) -> Double
+
+fn lu_decomposition(Matrix) -> LUDecomposition
+
+fn manhattan_distance(Array[Double], Array[Double]) -> Double
+
+fn median(Array[Double]) -> Double
+
+fn percentile(Array[Double], Double) -> Double
+
+fn pinverse(Matrix, Int, Int, Double) -> Matrix
+
+fn qr_decomposition(Matrix) -> QRDecomposition
+
+fn rank(Matrix, Double) -> Int
+
+fn skewness(Array[Double]) -> Double
+
+fn solve_linear_system(Matrix, Vector) -> Vector
+
+fn svd(Matrix, Int, Int, Double) -> SVDResult
+
+fn trace(Matrix) -> Double
+
+// Errors
+
+// Types and methods
+pub struct CholeskyDecomposition {
+  l : Matrix
+}
+
+pub struct EigenDecomposition {
+  values : Vector
+  vectors : Matrix
+}
+
+pub struct LUDecomposition {
+  l : Matrix
+  u : Matrix
+  p : Array[Int]
+}
+
+pub struct Matrix {
+  data : Array[Array[Double]]
+  rows : Int
+  cols : Int
+}
+fn Matrix::copy(Self) -> Self
+fn Matrix::fill(Int, Int, Double) -> Self
+fn Matrix::get(Self, Int, Int) -> Double
+fn Matrix::get_col(Self, Int) -> Vector
+fn Matrix::get_row(Self, Int) -> Vector
+fn Matrix::hadamard(Self, Self) -> Self
+fn Matrix::identity(Int) -> Self
+fn Matrix::map(Self, (Double) -> Double) -> Self
+fn Matrix::matmul(Self, Self) -> Self
+fn Matrix::matvec(Self, Vector) -> Vector
+fn Matrix::mean(Self) -> Double
+fn Matrix::new(Array[Array[Double]]) -> Self
+fn Matrix::norm_frobenius(Self) -> Double
+fn Matrix::ones(Int, Int) -> Self
+fn Matrix::op_add(Self, Self) -> Self
+fn Matrix::op_mul(Self, Double) -> Self
+fn Matrix::op_sub(Self, Self) -> Self
+fn Matrix::set(Self, Int, Int, Double) -> Unit
+fn Matrix::shape(Self) -> (Int, Int)
+fn Matrix::sum(Self) -> Double
+fn Matrix::sum_cols(Self) -> Vector
+fn Matrix::sum_rows(Self) -> Vector
+fn Matrix::to_string(Self) -> String
+fn Matrix::transpose(Self) -> Self
+fn Matrix::zeros(Int, Int) -> Self
+
+pub struct QRDecomposition {
+  q : Matrix
+  r : Matrix
+}
+
+pub struct SVDResult {
+  u : Matrix
+  s : Vector
+  vt : Matrix
+}
+
+pub struct Tensor {
+  data : Array[Double]
+  shape : Array[Int]
+  strides : Array[Int]
+  size : Int
+}
+fn Tensor::add(Self, Self) -> Self // from trait `Add`
+fn Tensor::copy(Self) -> Self
+fn Tensor::fill(Array[Int], Double) -> Self
+fn Tensor::flatten(Self) -> Self
+fn Tensor::from_matrix(Matrix) -> Self
+fn Tensor::from_vector(Vector) -> Self
+fn Tensor::get(Self, Array[Int]) -> Double
+fn Tensor::get_shape(Self) -> Array[Int]
+fn Tensor::hadamard(Self, Self) -> Self
+fn Tensor::map(Self, (Double) -> Double) -> Self
+fn Tensor::max(Self) -> Double
+fn Tensor::mean(Self) -> Double
+fn Tensor::min(Self) -> Double
+fn Tensor::mul(Self, Self) -> Self // from trait `Mul`
+fn Tensor::ndim(Self) -> Int
+fn Tensor::new(Array[Double], Array[Int]) -> Self
+fn Tensor::ones(Array[Int]) -> Self
+fn Tensor::op_add(Self, Self) -> Self
+fn Tensor::op_mul(Self, Self) -> Self
+fn Tensor::op_sub(Self, Self) -> Self
+fn Tensor::reshape(Self, Array[Int]) -> Self
+fn Tensor::scalar_mul(Self, Double) -> Self
+fn Tensor::set(Self, Array[Int], Double) -> Unit
+fn Tensor::sub(Self, Self) -> Self // from trait `Sub`
+fn Tensor::sum(Self) -> Double
+fn Tensor::sum_axis(Self, Int) -> Self
+fn Tensor::to_matrix(Self) -> Matrix
+fn Tensor::to_string(Self) -> String
+fn Tensor::to_vector(Self) -> Vector
+fn Tensor::total_size(Self) -> Int
+fn Tensor::transpose(Self) -> Self
+fn Tensor::zeros(Array[Int]) -> Self
+impl Add for Tensor
+impl Mul for Tensor
+impl Sub for Tensor
+
+pub struct Vector {
+  data : Array[Double]
+}
+fn Vector::copy(Self) -> Self
+fn Vector::dot(Self, Self) -> Double
+fn Vector::fill(Int, Double) -> Self
+fn Vector::from_list(Array[Double]) -> Self
+fn Vector::get(Self, Int) -> Double
+fn Vector::hadamard(Self, Self) -> Self
+fn Vector::map(Self, (Double) -> Double) -> Self
+fn Vector::max(Self) -> Double
+fn Vector::mean(Self) -> Double
+fn Vector::min(Self) -> Double
+fn Vector::new(Array[Double]) -> Self
+fn Vector::norm_inf(Self) -> Double
+fn Vector::norm_l1(Self) -> Double
+fn Vector::norm_l2(Self) -> Double
+fn Vector::normalize(Self) -> Self
+fn Vector::ones(Int) -> Self
+fn Vector::op_add(Self, Self) -> Self
+fn Vector::op_div(Self, Double) -> Self
+fn Vector::op_mul(Self, Double) -> Self
+fn Vector::op_sub(Self, Self) -> Self
+fn Vector::set(Self, Int, Double) -> Unit
+fn Vector::size(Self) -> Int
+fn Vector::std(Self) -> Double
+fn Vector::sum(Self) -> Double
+fn Vector::to_array(Self) -> Array[Double]
+fn Vector::to_string(Self) -> String
+fn Vector::variance(Self) -> Double
+fn Vector::zeros(Int) -> Self
+
+// Type aliases
+
+// Traits
+

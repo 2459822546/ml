@@ -1,0 +1,76 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/data"
+
+// Values
+fn k_fold_split(Array[Array[Double]], Array[Double], Int) -> Array[(Dataset, Dataset)]
+
+fn train_test_split(Array[Array[Double]], Array[Double], test_size? : Double, shuffle? : Bool, random_seed? : Int) -> (Dataset, Dataset)
+
+// Errors
+
+// Types and methods
+pub struct BatchIterator {
+  data : Array[Array[Double]]
+  batch_size : Int
+  mut current_idx : Int
+}
+fn BatchIterator::all_batches(Self) -> Array[Array[Array[Double]]]
+fn BatchIterator::n_batches(Self) -> Int
+fn BatchIterator::new(Array[Array[Double]], Int) -> Self
+fn BatchIterator::next(Self) -> Array[Array[Double]]?
+fn BatchIterator::reset(Self) -> Unit
+
+pub struct DataFrame {
+  columns : Array[String]
+  mut data : Array[Array[Double]]
+  mut index : Array[Int]
+}
+fn DataFrame::add_row(Self, Array[Double]) -> Unit
+fn DataFrame::describe(Self) -> Unit
+fn DataFrame::empty(Array[String]) -> Self
+fn DataFrame::get_column(Self, String) -> Array[Double]
+fn DataFrame::get_column_by_index(Self, Int) -> Array[Double]
+fn DataFrame::get_columns(Self) -> Array[String]
+fn DataFrame::get_row(Self, Int) -> Array[Double]
+fn DataFrame::head(Self, Int) -> Self
+fn DataFrame::n_cols(Self) -> Int
+fn DataFrame::n_rows(Self) -> Int
+fn DataFrame::new(Array[String], Array[Array[Double]]) -> Self
+fn DataFrame::select(Self, Array[String]) -> Self
+fn DataFrame::set(Self, Int, Int, Double) -> Unit
+fn DataFrame::shape(Self) -> (Int, Int)
+fn DataFrame::slice(Self, Int, Int) -> Self
+fn DataFrame::tail(Self, Int) -> Self
+fn DataFrame::to_array(Self) -> Array[Array[Double]]
+
+pub struct DataLoader {
+  dataset : Dataset
+  batch_size : Int
+  shuffle : Bool
+  mut current_epoch : Int
+  indices : Array[Int]
+  mut current_idx : Int
+}
+fn DataLoader::all_batches(Self) -> Array[(Array[Array[Double]], Array[Double])]
+fn DataLoader::for_each_batch(Self, (Array[Array[Double]], Array[Double]) -> Unit) -> Unit
+fn DataLoader::n_batches(Self) -> Int
+fn DataLoader::new(Dataset, batch_size? : Int, shuffle? : Bool) -> Self
+fn DataLoader::next_batch(Self) -> (Array[Array[Double]], Array[Double])?
+fn DataLoader::reset(Self) -> Unit
+
+pub struct Dataset {
+  features : Array[Array[Double]]
+  labels : Array[Double]
+}
+fn Dataset::get(Self, Int) -> (Array[Double], Double)
+fn Dataset::get_features(Self) -> Array[Array[Double]]
+fn Dataset::get_labels(Self) -> Array[Double]
+fn Dataset::len(Self) -> Int
+fn Dataset::n_features(Self) -> Int
+fn Dataset::new(Array[Array[Double]], Array[Double]) -> Self
+fn Dataset::slice(Self, Int, Int) -> Self
+
+// Type aliases
+
+// Traits
+

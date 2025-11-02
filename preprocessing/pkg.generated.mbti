@@ -1,0 +1,109 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/preprocessing"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct Binarizer {
+  threshold : Double
+}
+fn Binarizer::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn Binarizer::new(threshold? : Double) -> Self
+fn Binarizer::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+pub struct LabelEncoder {
+  mut classes : Array[String]
+  mut class_to_index : Map[String, Int]
+  mut fitted : Bool
+}
+fn LabelEncoder::fit(Self, Array[String]) -> Unit
+fn LabelEncoder::fit_transform(Self, Array[String]) -> Array[Int]
+fn LabelEncoder::get_classes(Self) -> Array[String]
+fn LabelEncoder::inverse_transform(Self, Array[Int]) -> Array[String]
+fn LabelEncoder::new() -> Self
+fn LabelEncoder::transform(Self, Array[String]) -> Array[Int]
+
+pub struct MinMaxScaler {
+  mut data_min : Array[Double]
+  mut data_max : Array[Double]
+  feature_range_min : Double
+  feature_range_max : Double
+  mut fitted : Bool
+}
+fn MinMaxScaler::fit(Self, Array[Array[Double]]) -> Unit
+fn MinMaxScaler::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn MinMaxScaler::inverse_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn MinMaxScaler::new(feature_range? : (Double, Double)) -> Self
+fn MinMaxScaler::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+pub(all) enum NormType {
+  L1
+  L2
+  Max
+}
+fn NormType::equal(Self, Self) -> Bool // from trait `Eq`
+#deprecated
+fn NormType::op_equal(Self, Self) -> Bool // from trait `Eq`
+fn NormType::output(Self, &Logger) -> Unit // from trait `Show`
+fn NormType::to_string(Self) -> String // from trait `Show`
+impl Eq for NormType
+impl Show for NormType
+
+pub struct Normalizer {
+  norm : NormType
+}
+fn Normalizer::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn Normalizer::new(norm? : NormType) -> Self
+fn Normalizer::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+pub struct OneHotEncoder {
+  mut categories : Array[Array[String]]
+  mut fitted : Bool
+}
+fn OneHotEncoder::fit(Self, Array[Array[String]]) -> Unit
+fn OneHotEncoder::fit_transform(Self, Array[Array[String]]) -> Array[Array[Double]]
+fn OneHotEncoder::get_feature_names(Self) -> Array[String]
+fn OneHotEncoder::new() -> Self
+fn OneHotEncoder::transform(Self, Array[Array[String]]) -> Array[Array[Double]]
+
+pub struct PolynomialFeatures {
+  degree : Int
+  include_bias : Bool
+  interaction_only : Bool
+  mut n_input_features : Int
+  mut n_output_features : Int
+  mut fitted : Bool
+}
+fn PolynomialFeatures::fit(Self, Array[Array[Double]]) -> Unit
+fn PolynomialFeatures::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn PolynomialFeatures::get_n_output_features(Self) -> Int
+fn PolynomialFeatures::new(degree? : Int, include_bias? : Bool, interaction_only? : Bool) -> Self
+fn PolynomialFeatures::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+pub struct RobustScaler {
+  mut median : Array[Double]
+  mut iqr : Array[Double]
+  mut fitted : Bool
+}
+fn RobustScaler::fit(Self, Array[Array[Double]]) -> Unit
+fn RobustScaler::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn RobustScaler::new() -> Self
+fn RobustScaler::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+pub struct StandardScaler {
+  mut mean : Array[Double]
+  mut std : Array[Double]
+  mut fitted : Bool
+}
+fn StandardScaler::fit(Self, Array[Array[Double]]) -> Unit
+fn StandardScaler::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn StandardScaler::inverse_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn StandardScaler::new() -> Self
+fn StandardScaler::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+// Type aliases
+
+// Traits
+
