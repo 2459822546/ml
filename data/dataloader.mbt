@@ -19,6 +19,9 @@ pub fn DataLoader::new(
   if batch_size <= 0 {
     abort("batch_size 必须大于 0")
   }
+  if dataset.len() == 0 {
+    abort("dataset 不能为空")
+  }
   let n_samples = dataset.len()
   let indices = Array::make(n_samples, 0)
   for i = 0; i < n_samples; i = i + 1 {
@@ -29,14 +32,14 @@ pub fn DataLoader::new(
 
 ///|
 /// 获取总批次数
-pub fn n_batches(self : DataLoader) -> Int {
+pub fn DataLoader::n_batches(self : DataLoader) -> Int {
   let n_samples = self.dataset.len()
   (n_samples + self.batch_size - 1) / self.batch_size
 }
 
 ///|
 /// 重置迭代器
-pub fn reset(self : DataLoader) -> Unit {
+pub fn DataLoader::reset(self : DataLoader) -> Unit {
   self.current_idx = 0
   if self.shuffle {
     shuffle_indices(self.indices, self.current_epoch)
@@ -46,7 +49,9 @@ pub fn reset(self : DataLoader) -> Unit {
 
 ///|
 /// 获取下一批数据
-pub fn next_batch(self : DataLoader) -> (Array[Array[Double]], Array[Double])? {
+pub fn DataLoader::next_batch(
+  self : DataLoader,
+) -> (Array[Array[Double]], Array[Double])? {
   if self.current_idx >= self.dataset.len() {
     return None
   }
@@ -74,7 +79,7 @@ pub fn next_batch(self : DataLoader) -> (Array[Array[Double]], Array[Double])? {
 
 ///|
 /// 获取所有批次
-pub fn all_batches(
+pub fn DataLoader::all_batches(
   self : DataLoader,
 ) -> Array[(Array[Array[Double]], Array[Double])] {
   self.reset()
@@ -96,7 +101,7 @@ pub fn all_batches(
 
 ///|
 /// 遍历所有批次（函数式接口）
-pub fn for_each_batch(
+pub fn DataLoader::for_each_batch(
   self : DataLoader,
   f : (Array[Array[Double]], Array[Double]) -> Unit,
 ) -> Unit {
@@ -145,19 +150,19 @@ pub fn BatchIterator::new(
 
 ///|
 /// 获取总批次数
-pub fn n_batches(self : BatchIterator) -> Int {
+pub fn BatchIterator::n_batches(self : BatchIterator) -> Int {
   (self.data.length() + self.batch_size - 1) / self.batch_size
 }
 
 ///|
 /// 重置迭代器
-pub fn reset(self : BatchIterator) -> Unit {
+pub fn BatchIterator::reset(self : BatchIterator) -> Unit {
   self.current_idx = 0
 }
 
 ///|
 /// 获取下一批数据
-pub fn next(self : BatchIterator) -> Array[Array[Double]]? {
+pub fn BatchIterator::next(self : BatchIterator) -> Array[Array[Double]]? {
   if self.current_idx >= self.data.length() {
     return None
   }
@@ -181,7 +186,9 @@ pub fn next(self : BatchIterator) -> Array[Array[Double]]? {
 
 ///|
 /// 获取所有批次
-pub fn all_batches(self : BatchIterator) -> Array[Array[Array[Double]]] {
+pub fn BatchIterator::all_batches(
+  self : BatchIterator,
+) -> Array[Array[Array[Double]]] {
   self.reset()
   let batches = []
   while true {
