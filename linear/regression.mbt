@@ -54,7 +54,11 @@ pub fn LinearRegression::new() -> LinearRegression {
 /// 训练线性回归模型（使用正规方程）
 /// X: n_samples x n_features
 /// y: n_samples
-pub fn fit(self : LinearRegression, x : @math.Matrix, y : @math.Vector) -> Unit {
+pub fn LinearRegression::fit(
+  self : LinearRegression,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
   let (n_samples, n_features) = x.shape()
   if y.size() != n_samples {
     abort("X 和 y 的样本数不匹配")
@@ -66,6 +70,11 @@ pub fn fit(self : LinearRegression, x : @math.Matrix, y : @math.Vector) -> Unit 
   // 使用正规方程: w = (X^T X)^(-1) X^T y
   let xt = x_with_intercept.transpose()
   let xtx = xt.matmul(x_with_intercept)
+  // 为避免 X^T X 奇异，给特征对角线添加极小L2正则
+  let eps = 1.0e-8
+  for i = 1; i < n_features + 1; i = i + 1 {
+    xtx.set(i, i, xtx.get(i, i) + eps)
+  }
   let xty = xt.matvec(y)
 
   // 求解线性方程组
@@ -81,7 +90,10 @@ pub fn fit(self : LinearRegression, x : @math.Matrix, y : @math.Vector) -> Unit 
 
 ///|
 /// 预测
-pub fn predict(self : LinearRegression, x : @math.Matrix) -> @math.Vector {
+pub fn LinearRegression::predict(
+  self : LinearRegression,
+  x : @math.Matrix,
+) -> @math.Vector {
   if not(self.is_fitted) {
     abort("模型尚未训练")
   }
@@ -96,7 +108,7 @@ pub fn predict(self : LinearRegression, x : @math.Matrix) -> @math.Vector {
 
 ///|
 /// 计算 R² 分数
-pub fn score(
+pub fn LinearRegression::score(
   self : LinearRegression,
   x : @math.Matrix,
   y : @math.Vector,
@@ -115,7 +127,7 @@ pub fn Ridge::new(alpha : Double) -> Ridge {
 
 ///|
 /// 训练岭回归模型
-pub fn fit(self : Ridge, x : @math.Matrix, y : @math.Vector) -> Unit {
+pub fn Ridge::fit(self : Ridge, x : @math.Matrix, y : @math.Vector) -> Unit {
   let (n_samples, n_features) = x.shape()
   if y.size() != n_samples {
     abort("X 和 y 的样本数不匹配")
@@ -145,7 +157,7 @@ pub fn fit(self : Ridge, x : @math.Matrix, y : @math.Vector) -> Unit {
 }
 
 ///|
-pub fn predict(self : Ridge, x : @math.Matrix) -> @math.Vector {
+pub fn Ridge::predict(self : Ridge, x : @math.Matrix) -> @math.Vector {
   if not(self.is_fitted) {
     abort("模型尚未训练")
   }
@@ -159,7 +171,7 @@ pub fn predict(self : Ridge, x : @math.Matrix) -> @math.Vector {
 }
 
 ///|
-pub fn score(self : Ridge, x : @math.Matrix, y : @math.Vector) -> Double {
+pub fn Ridge::score(self : Ridge, x : @math.Matrix, y : @math.Vector) -> Double {
   let y_pred = self.predict(x)
   r2_score(y, y_pred)
 }
@@ -193,7 +205,7 @@ fn soft_threshold(x : Double, lambda : Double) -> Double {
 
 ///|
 /// 训练 Lasso 回归（使用坐标下降法）
-pub fn fit(self : Lasso, x : @math.Matrix, y : @math.Vector) -> Unit {
+pub fn Lasso::fit(self : Lasso, x : @math.Matrix, y : @math.Vector) -> Unit {
   let (n_samples, n_features) = x.shape()
   if y.size() != n_samples {
     abort("X 和 y 的样本数不匹配")
@@ -237,7 +249,7 @@ pub fn fit(self : Lasso, x : @math.Matrix, y : @math.Vector) -> Unit {
 }
 
 ///|
-pub fn predict(self : Lasso, x : @math.Matrix) -> @math.Vector {
+pub fn Lasso::predict(self : Lasso, x : @math.Matrix) -> @math.Vector {
   if not(self.is_fitted) {
     abort("模型尚未训练")
   }
@@ -252,7 +264,7 @@ pub fn predict(self : Lasso, x : @math.Matrix) -> @math.Vector {
 }
 
 ///|
-pub fn score(self : Lasso, x : @math.Matrix, y : @math.Vector) -> Double {
+pub fn Lasso::score(self : Lasso, x : @math.Matrix, y : @math.Vector) -> Double {
   let y_pred = self.predict(x)
   r2_score(y, y_pred)
 }
@@ -280,7 +292,11 @@ pub fn ElasticNet::new(
 
 ///|
 /// 训练弹性网络（结合 L1 和 L2 正则化）
-pub fn fit(self : ElasticNet, x : @math.Matrix, y : @math.Vector) -> Unit {
+pub fn ElasticNet::fit(
+  self : ElasticNet,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
   let (n_samples, n_features) = x.shape()
   if y.size() != n_samples {
     abort("X 和 y 的样本数不匹配")
@@ -322,7 +338,7 @@ pub fn fit(self : ElasticNet, x : @math.Matrix, y : @math.Vector) -> Unit {
 }
 
 ///|
-pub fn predict(self : ElasticNet, x : @math.Matrix) -> @math.Vector {
+pub fn ElasticNet::predict(self : ElasticNet, x : @math.Matrix) -> @math.Vector {
   if not(self.is_fitted) {
     abort("模型尚未训练")
   }
@@ -337,7 +353,11 @@ pub fn predict(self : ElasticNet, x : @math.Matrix) -> @math.Vector {
 }
 
 ///|
-pub fn score(self : ElasticNet, x : @math.Matrix, y : @math.Vector) -> Double {
+pub fn ElasticNet::score(
+  self : ElasticNet,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Double {
   let y_pred = self.predict(x)
   r2_score(y, y_pred)
 }

@@ -1,0 +1,110 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/linear"
+
+import(
+  "2459822546/ml/math"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct ElasticNet {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+  alpha : Double
+  l1_ratio : Double
+  max_iter : Int
+  tol : Double
+}
+fn ElasticNet::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn ElasticNet::new(Double, Double, Int, Double) -> Self
+fn ElasticNet::predict(Self, @math.Matrix) -> @math.Vector
+fn ElasticNet::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct Lasso {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+  alpha : Double
+  max_iter : Int
+  tol : Double
+}
+fn Lasso::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn Lasso::new(Double, Int, Double) -> Self
+fn Lasso::predict(Self, @math.Matrix) -> @math.Vector
+fn Lasso::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct LinearRegression {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+}
+fn LinearRegression::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn LinearRegression::new() -> Self
+fn LinearRegression::predict(Self, @math.Matrix) -> @math.Vector
+fn LinearRegression::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct LogisticRegression {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+  learning_rate : Double
+  max_iter : Int
+  tol : Double
+}
+fn LogisticRegression::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn LogisticRegression::new(Double, Int, Double) -> Self
+fn LogisticRegression::predict(Self, @math.Matrix) -> @math.Vector
+fn LogisticRegression::predict_proba(Self, @math.Matrix) -> @math.Vector
+fn LogisticRegression::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub(all) enum LossFunction {
+  Hinge
+  Log
+  Perceptron
+}
+
+pub struct Perceptron {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+  learning_rate : Double
+  max_iter : Int
+}
+fn Perceptron::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn Perceptron::new(Double, Int) -> Self
+fn Perceptron::predict(Self, @math.Matrix) -> @math.Vector
+fn Perceptron::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct Ridge {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+  alpha : Double
+}
+fn Ridge::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn Ridge::new(Double) -> Self
+fn Ridge::predict(Self, @math.Matrix) -> @math.Vector
+fn Ridge::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct SGDClassifier {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+  learning_rate : Double
+  max_iter : Int
+  alpha : Double
+  loss : LossFunction
+}
+fn SGDClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn SGDClassifier::new(Double, Int, Double, LossFunction) -> Self
+fn SGDClassifier::predict(Self, @math.Matrix) -> @math.Vector
+fn SGDClassifier::score(Self, @math.Matrix, @math.Vector) -> Double
+
+// Type aliases
+
+// Traits
+

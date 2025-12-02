@@ -36,6 +36,17 @@ pub struct SGDClassifier {
 }
 
 ///|
+/// 校验标签是否为二元 {0, 1}
+fn validate_binary_labels(y : @math.Vector) -> Unit {
+  for i = 0; i < y.size(); i = i + 1 {
+    let val = y.get(i)
+    if not(val == 0.0 || val == 1.0) {
+      abort("标签必须是 0 或 1")
+    }
+  }
+}
+
+///|
 /// 损失函数类型
 pub(all) enum LossFunction {
   Hinge // SVM 损失
@@ -52,6 +63,15 @@ pub fn LogisticRegression::new(
   max_iter : Int,
   tol : Double,
 ) -> LogisticRegression {
+  if learning_rate <= 0.0 {
+    abort("learning_rate 必须大于 0")
+  }
+  if max_iter <= 0 {
+    abort("max_iter 必须大于 0")
+  }
+  if tol <= 0.0 {
+    abort("tol 必须大于 0")
+  }
   {
     weights: @math.Vector::zeros(0),
     intercept: 0.0,
@@ -70,7 +90,7 @@ fn sigmoid(z : Double) -> Double {
 
 ///|
 /// 训练逻辑回归模型（使用梯度下降）
-pub fn fit(
+pub fn LogisticRegression::fit(
   self : LogisticRegression,
   x : @math.Matrix,
   y : @math.Vector,
@@ -79,6 +99,7 @@ pub fn fit(
   if y.size() != n_samples {
     abort("X 和 y 的样本数不匹配")
   }
+  validate_binary_labels(y)
 
   // 初始化权重
   self.weights = @math.Vector::zeros(n_features)
@@ -125,7 +146,7 @@ pub fn fit(
 
 ///|
 /// 预测概率
-pub fn predict_proba(
+pub fn LogisticRegression::predict_proba(
   self : LogisticRegression,
   x : @math.Matrix,
 ) -> @math.Vector {
@@ -144,7 +165,10 @@ pub fn predict_proba(
 
 ///|
 /// 预测类别（阈值为0.5）
-pub fn predict(self : LogisticRegression, x : @math.Matrix) -> @math.Vector {
+pub fn LogisticRegression::predict(
+  self : LogisticRegression,
+  x : @math.Matrix,
+) -> @math.Vector {
   let probas = self.predict_proba(x)
   let predictions = Array::make(probas.size(), 0.0)
   for i = 0; i < probas.size(); i = i + 1 {
@@ -155,7 +179,7 @@ pub fn predict(self : LogisticRegression, x : @math.Matrix) -> @math.Vector {
 
 ///|
 /// 计算准确率
-pub fn score(
+pub fn LogisticRegression::score(
   self : LogisticRegression,
   x : @math.Matrix,
   y : @math.Vector,
@@ -169,6 +193,12 @@ pub fn score(
 
 ///|
 pub fn Perceptron::new(learning_rate : Double, max_iter : Int) -> Perceptron {
+  if learning_rate <= 0.0 {
+    abort("learning_rate 必须大于 0")
+  }
+  if max_iter <= 0 {
+    abort("max_iter 必须大于 0")
+  }
   {
     weights: @math.Vector::zeros(0),
     intercept: 0.0,
@@ -180,11 +210,16 @@ pub fn Perceptron::new(learning_rate : Double, max_iter : Int) -> Perceptron {
 
 ///|
 /// 训练感知机
-pub fn fit(self : Perceptron, x : @math.Matrix, y : @math.Vector) -> Unit {
+pub fn Perceptron::fit(
+  self : Perceptron,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
   let (n_samples, n_features) = x.shape()
   if y.size() != n_samples {
     abort("X 和 y 的样本数不匹配")
   }
+  validate_binary_labels(y)
 
   // 初始化权重
   self.weights = @math.Vector::zeros(n_features)
@@ -221,7 +256,7 @@ pub fn fit(self : Perceptron, x : @math.Matrix, y : @math.Vector) -> Unit {
 
 ///|
 /// 预测
-pub fn predict(self : Perceptron, x : @math.Matrix) -> @math.Vector {
+pub fn Perceptron::predict(self : Perceptron, x : @math.Matrix) -> @math.Vector {
   if not(self.is_fitted) {
     abort("模型尚未训练")
   }
@@ -236,7 +271,11 @@ pub fn predict(self : Perceptron, x : @math.Matrix) -> @math.Vector {
 }
 
 ///|
-pub fn score(self : Perceptron, x : @math.Matrix, y : @math.Vector) -> Double {
+pub fn Perceptron::score(
+  self : Perceptron,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Double {
   let y_pred = self.predict(x)
   accuracy_score(y, y_pred)
 }
@@ -251,6 +290,15 @@ pub fn SGDClassifier::new(
   alpha : Double,
   loss : LossFunction,
 ) -> SGDClassifier {
+  if learning_rate <= 0.0 {
+    abort("learning_rate 必须大于 0")
+  }
+  if max_iter <= 0 {
+    abort("max_iter 必须大于 0")
+  }
+  if alpha < 0.0 {
+    abort("alpha 不能为负")
+  }
   {
     weights: @math.Vector::zeros(0),
     intercept: 0.0,
@@ -264,11 +312,16 @@ pub fn SGDClassifier::new(
 
 ///|
 /// 训练 SGD 分类器
-pub fn fit(self : SGDClassifier, x : @math.Matrix, y : @math.Vector) -> Unit {
+pub fn SGDClassifier::fit(
+  self : SGDClassifier,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
   let (n_samples, n_features) = x.shape()
   if y.size() != n_samples {
     abort("X 和 y 的样本数不匹配")
   }
+  validate_binary_labels(y)
 
   // 初始化权重
   self.weights = @math.Vector::zeros(n_features)
@@ -329,7 +382,10 @@ pub fn fit(self : SGDClassifier, x : @math.Matrix, y : @math.Vector) -> Unit {
 
 ///|
 /// 预测
-pub fn predict(self : SGDClassifier, x : @math.Matrix) -> @math.Vector {
+pub fn SGDClassifier::predict(
+  self : SGDClassifier,
+  x : @math.Matrix,
+) -> @math.Vector {
   if not(self.is_fitted) {
     abort("模型尚未训练")
   }
@@ -359,7 +415,7 @@ pub fn predict(self : SGDClassifier, x : @math.Matrix) -> @math.Vector {
 }
 
 ///|
-pub fn score(
+pub fn SGDClassifier::score(
   self : SGDClassifier,
   x : @math.Matrix,
   y : @math.Vector,
