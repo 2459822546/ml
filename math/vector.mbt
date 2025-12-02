@@ -52,16 +52,24 @@ pub fn Vector::to_array(self : Vector) -> Array[Double] {
   self.data
 }
 
+///|
+/// 内部工具：保证两个向量维度一致，返回长度
+fn ensure_same_size(lhs : Vector, rhs : Vector) -> Int {
+  let size = lhs.size()
+  if size != rhs.size() {
+    abort("向量维度不匹配")
+  }
+  size
+}
+
 ///| 向量运算
 
 ///|
 /// 向量加法
 pub fn Vector::op_add(self : Vector, other : Vector) -> Vector {
-  if self.size() != other.size() {
-    abort("向量维度不匹配")
-  }
-  let result = Array::make(self.size(), 0.0)
-  for i = 0; i < self.size(); i = i + 1 {
+  let size = ensure_same_size(self, other)
+  let result = Array::make(size, 0.0)
+  for i = 0; i < size; i = i + 1 {
     result[i] = self.data[i] + other.data[i]
   }
   Vector::new(result)
@@ -70,11 +78,9 @@ pub fn Vector::op_add(self : Vector, other : Vector) -> Vector {
 ///|
 /// 向量减法
 pub fn Vector::op_sub(self : Vector, other : Vector) -> Vector {
-  if self.size() != other.size() {
-    abort("向量维度不匹配")
-  }
-  let result = Array::make(self.size(), 0.0)
-  for i = 0; i < self.size(); i = i + 1 {
+  let size = ensure_same_size(self, other)
+  let result = Array::make(size, 0.0)
+  for i = 0; i < size; i = i + 1 {
     result[i] = self.data[i] - other.data[i]
   }
   Vector::new(result)
@@ -106,11 +112,9 @@ pub fn Vector::op_div(self : Vector, scalar : Double) -> Vector {
 ///|
 /// 元素级乘法 (Hadamard product)
 pub fn Vector::hadamard(self : Vector, other : Vector) -> Vector {
-  if self.size() != other.size() {
-    abort("向量维度不匹配")
-  }
-  let result = Array::make(self.size(), 0.0)
-  for i = 0; i < self.size(); i = i + 1 {
+  let size = ensure_same_size(self, other)
+  let result = Array::make(size, 0.0)
+  for i = 0; i < size; i = i + 1 {
     result[i] = self.data[i] * other.data[i]
   }
   Vector::new(result)
@@ -119,11 +123,9 @@ pub fn Vector::hadamard(self : Vector, other : Vector) -> Vector {
 ///|
 /// 点积 (内积)
 pub fn Vector::dot(self : Vector, other : Vector) -> Double {
-  if self.size() != other.size() {
-    abort("向量维度不匹配")
-  }
+  let size = ensure_same_size(self, other)
   let mut sum = 0.0
-  for i = 0; i < self.size(); i = i + 1 {
+  for i = 0; i < size; i = i + 1 {
     sum = sum + self.data[i] * other.data[i]
   }
   sum
