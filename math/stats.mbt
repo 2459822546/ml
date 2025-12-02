@@ -114,30 +114,24 @@ pub fn kurtosis(data : Array[Double]) -> Double {
   sum_fourth / n.to_double() / (variance * variance) - 3.0
 }
 
-///| 相关性分析
-
 ///|
-/// 计算协方差
-pub fn covariance(x : Array[Double], y : Array[Double]) -> Double {
+/// 长度校验，返回长度方便后续使用
+fn ensure_same_length(x : Array[Double], y : Array[Double]) -> Int {
   if x.length() != y.length() {
     abort("数组长度必须相同")
   }
-  if x.length() == 0 {
+  x.length()
+}
+
+///|
+/// 协方差
+pub fn covariance(x : Array[Double], y : Array[Double]) -> Double {
+  let n = ensure_same_length(x, y)
+  if n == 0 {
     abort("空数组无法计算协方差")
   }
-  let n = x.length()
-
-  // 计算均值
-  let mut sum_x = 0.0
-  let mut sum_y = 0.0
-  for i = 0; i < n; i = i + 1 {
-    sum_x = sum_x + x[i]
-    sum_y = sum_y + y[i]
-  }
-  let mean_x = sum_x / n.to_double()
-  let mean_y = sum_y / n.to_double()
-
-  // 计算协方差
+  let mean_x = mean(x)
+  let mean_y = mean(y)
   let mut cov = 0.0
   for i = 0; i < n; i = i + 1 {
     cov = cov + (x[i] - mean_x) * (y[i] - mean_y)
@@ -146,27 +140,14 @@ pub fn covariance(x : Array[Double], y : Array[Double]) -> Double {
 }
 
 ///|
-/// 计算皮尔逊相关系数
+/// 皮尔逊相关系数
 pub fn correlation(x : Array[Double], y : Array[Double]) -> Double {
-  if x.length() != y.length() {
-    abort("数组长度必须相同")
-  }
-  if x.length() == 0 {
+  let n = ensure_same_length(x, y)
+  if n == 0 {
     abort("空数组无法计算相关系数")
   }
-  let n = x.length()
-
-  // 计算均值
-  let mut sum_x = 0.0
-  let mut sum_y = 0.0
-  for i = 0; i < n; i = i + 1 {
-    sum_x = sum_x + x[i]
-    sum_y = sum_y + y[i]
-  }
-  let mean_x = sum_x / n.to_double()
-  let mean_y = sum_y / n.to_double()
-
-  // 计算相关系数
+  let mean_x = mean(x)
+  let mean_y = mean(y)
   let mut numerator = 0.0
   let mut sum_sq_x = 0.0
   let mut sum_sq_y = 0.0
@@ -183,8 +164,6 @@ pub fn correlation(x : Array[Double], y : Array[Double]) -> Double {
   }
   numerator / denominator
 }
-
-///| 距离度量
 
 ///|
 /// 欧几里得距离
