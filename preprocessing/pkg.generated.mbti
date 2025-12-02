@@ -2,6 +2,11 @@
 package "2459822546/ml/preprocessing"
 
 // Values
+fn transformer_minmax(MinMaxScaler) -> Transformer
+
+fn transformer_polynomial(PolynomialFeatures) -> Transformer
+
+fn transformer_standard(StandardScaler) -> Transformer
 
 // Errors
 
@@ -12,6 +17,17 @@ pub struct Binarizer {
 fn Binarizer::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
 fn Binarizer::new(threshold? : Double) -> Self
 fn Binarizer::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+pub struct ColumnTransformer {
+  mut transformers : Array[(String, Array[Int], Transformer)]
+  remainder_passthrough : Bool
+  mut fitted : Bool
+}
+fn ColumnTransformer::add(Self, String, Array[Int], Transformer) -> Unit
+fn ColumnTransformer::fit(Self, Array[Array[Double]]) -> Unit
+fn ColumnTransformer::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn ColumnTransformer::new(remainder_passthrough? : Bool) -> Self
+fn ColumnTransformer::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
 
 pub struct LabelEncoder {
   mut classes : Array[String]
@@ -63,6 +79,15 @@ fn OneHotEncoder::get_feature_names(Self) -> Array[String]
 fn OneHotEncoder::new() -> Self
 fn OneHotEncoder::transform(Self, Array[Array[String]]) -> Array[Array[Double]]
 
+pub struct Pipeline {
+  steps : Array[(String, Transformer)]
+}
+fn Pipeline::add_step(Self, String, Transformer) -> Unit
+fn Pipeline::fit(Self, Array[Array[Double]]) -> Unit
+fn Pipeline::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+fn Pipeline::new() -> Self
+fn Pipeline::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
 pub struct PolynomialFeatures {
   degree : Int
   include_bias : Bool
@@ -97,6 +122,12 @@ fn StandardScaler::fit_transform(Self, Array[Array[Double]]) -> Array[Array[Doub
 fn StandardScaler::inverse_transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
 fn StandardScaler::new() -> Self
 fn StandardScaler::transform(Self, Array[Array[Double]]) -> Array[Array[Double]]
+
+pub enum Transformer {
+  Standard(StandardScaler)
+  MinMax(MinMaxScaler)
+  Polynomial(PolynomialFeatures)
+}
 
 // Type aliases
 
