@@ -6,17 +6,33 @@ import(
 )
 
 // Values
+fn accuracy_score(@math.Vector, @math.Vector) -> Double
+
 fn chi_square_gof(Array[Double], Array[Double]) -> Double
 
 fn correlation_filter(@math.Matrix, Double) -> Array[Int]
+
+fn f1_score(@math.Vector, @math.Vector, eps? : Double) -> Double
 
 fn jarque_bera(Array[Double]) -> Double
 
 fn ks_test_two_sample(Array[Double], Array[Double]) -> Double
 
+fn mae(@math.Vector, @math.Vector) -> Double
+
+fn mse(@math.Vector, @math.Vector) -> Double
+
 fn mutual_information_scores(@math.Matrix, @math.Vector, n_bins? : Int) -> Array[Double]
 
+fn precision_score(@math.Vector, @math.Vector, eps? : Double) -> Double
+
+fn r2_score(@math.Vector, @math.Vector) -> Double
+
+fn recall_score(@math.Vector, @math.Vector, eps? : Double) -> Double
+
 fn rfe_linear_regression(@math.Matrix, @math.Vector, Int) -> Array[Int]
+
+fn rmse(@math.Vector, @math.Vector) -> Double
 
 fn select_by_mutual_information(@math.Matrix, @math.Vector, Int, n_bins? : Int) -> Array[Int]
 
