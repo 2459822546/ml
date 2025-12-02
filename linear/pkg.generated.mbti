@@ -10,6 +10,19 @@ import(
 // Errors
 
 // Types and methods
+pub struct BernoulliNB {
+  mut class_priors : Array[Double]
+  mut feature_log_prob : Array[Array[Double]]
+  mut feature_log_prob_neg : Array[Array[Double]]
+  mut classes : Array[Double]
+  alpha : Double
+  mut is_fitted : Bool
+}
+fn BernoulliNB::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn BernoulliNB::new(alpha? : Double) -> Self
+fn BernoulliNB::predict(Self, @math.Matrix) -> @math.Vector
+fn BernoulliNB::score(Self, @math.Matrix, @math.Vector) -> Double
+
 pub struct ElasticNet {
   mut weights : @math.Vector
   mut intercept : Double
@@ -23,6 +36,18 @@ fn ElasticNet::fit(Self, @math.Matrix, @math.Vector) -> Unit
 fn ElasticNet::new(Double, Double, Int, Double) -> Self
 fn ElasticNet::predict(Self, @math.Matrix) -> @math.Vector
 fn ElasticNet::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct GaussianNB {
+  mut class_priors : Array[Double]
+  mut class_means : Array[Array[Double]]
+  mut class_vars : Array[Array[Double]]
+  mut classes : Array[Double]
+  mut is_fitted : Bool
+}
+fn GaussianNB::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn GaussianNB::new() -> Self
+fn GaussianNB::predict(Self, @math.Matrix) -> @math.Vector
+fn GaussianNB::score(Self, @math.Matrix, @math.Vector) -> Double
 
 pub struct Lasso {
   mut weights : @math.Vector
@@ -67,6 +92,18 @@ pub(all) enum LossFunction {
   Log
   Perceptron
 }
+
+pub struct MultinomialNB {
+  mut class_priors : Array[Double]
+  mut feature_log_prob : Array[Array[Double]]
+  mut classes : Array[Double]
+  alpha : Double
+  mut is_fitted : Bool
+}
+fn MultinomialNB::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn MultinomialNB::new(alpha? : Double) -> Self
+fn MultinomialNB::predict(Self, @math.Matrix) -> @math.Vector
+fn MultinomialNB::score(Self, @math.Matrix, @math.Vector) -> Double
 
 pub struct OneVsRestClassifier {
   learning_rate : Double
