@@ -32,18 +32,30 @@ pub fn PolynomialFeatures::new(
 
 ///|
 /// 拟合数据（主要是记录特征数量）
-pub fn fit(self : PolynomialFeatures, data : Array[Array[Double]]) -> Unit {
+pub fn PolynomialFeatures::fit(
+  self : PolynomialFeatures,
+  data : Array[Array[Double]],
+) -> Unit {
   if data.length() == 0 {
     abort("数据不能为空")
   }
-  self.n_input_features = data[0].length()
+  let n_features = data[0].length()
+  if n_features == 0 {
+    abort("特征数量必须大于 0")
+  }
+  for i = 0; i < data.length(); i = i + 1 {
+    if data[i].length() != n_features {
+      abort("第 \{i} 行的特征数量与其他行不一致")
+    }
+  }
+  self.n_input_features = n_features
   self.n_output_features = self.calculate_n_output_features()
   self.fitted = true
 }
 
 ///|
 /// 转换数据生成多项式特征
-pub fn transform(
+pub fn PolynomialFeatures::transform(
   self : PolynomialFeatures,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -60,7 +72,7 @@ pub fn transform(
 
 ///|
 /// 拟合并转换
-pub fn fit_transform(
+pub fn PolynomialFeatures::fit_transform(
   self : PolynomialFeatures,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -70,7 +82,7 @@ pub fn fit_transform(
 
 ///|
 /// 转换单个样本
-fn transform_sample(
+fn PolynomialFeatures::transform_sample(
   self : PolynomialFeatures,
   sample : Array[Double],
 ) -> Array[Double] {
@@ -98,7 +110,7 @@ fn transform_sample(
 
 ///|
 /// 生成多项式特征（包括纯次幂）
-fn generate_polynomial_features(
+fn PolynomialFeatures::generate_polynomial_features(
   self : PolynomialFeatures,
   sample : Array[Double],
   features : Array[Double],
@@ -111,7 +123,7 @@ fn generate_polynomial_features(
 
 ///|
 /// 递归生成特征组合
-fn generate_combinations(
+fn PolynomialFeatures::generate_combinations(
   self : PolynomialFeatures,
   sample : Array[Double],
   features : Array[Double],
@@ -138,7 +150,7 @@ fn generate_combinations(
 
 ///|
 /// 生成交互特征（不包括纯次幂）
-fn generate_interaction_features(
+fn PolynomialFeatures::generate_interaction_features(
   self : PolynomialFeatures,
   sample : Array[Double],
   features : Array[Double],
@@ -158,7 +170,7 @@ fn generate_interaction_features(
 
 ///|
 /// 递归生成交互特征组合（确保不同特征的组合）
-fn generate_interaction_combinations(
+fn PolynomialFeatures::generate_interaction_combinations(
   self : PolynomialFeatures,
   sample : Array[Double],
   features : Array[Double],
@@ -185,7 +197,9 @@ fn generate_interaction_combinations(
 
 ///|
 /// 计算输出特征数量
-fn calculate_n_output_features(self : PolynomialFeatures) -> Int {
+fn PolynomialFeatures::calculate_n_output_features(
+  self : PolynomialFeatures,
+) -> Int {
   let n = self.n_input_features
   let d = self.degree
   let mut total = if self.include_bias { 1 } else { 0 }
@@ -223,7 +237,9 @@ fn binomial_coefficient(n : Int, k : Int) -> Int {
 
 ///|
 /// 获取输出特征数量
-pub fn get_n_output_features(self : PolynomialFeatures) -> Int {
+pub fn PolynomialFeatures::get_n_output_features(
+  self : PolynomialFeatures,
+) -> Int {
   if not(self.fitted) {
     abort("必须先调用 fit() 方法")
   }

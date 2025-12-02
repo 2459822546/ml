@@ -1,12 +1,12 @@
 ///|
-/// 为 String 扩展 compare 方法
-fn String::compare(self : String, other : String) -> Int {
-  let len_a = self.length()
-  let len_b = other.length()
+/// 字符串比较工具，用于排序
+fn compare_strings(a : String, b : String) -> Int {
+  let len_a = a.length()
+  let len_b = b.length()
   let min_len = if len_a < len_b { len_a } else { len_b }
   for i = 0; i < min_len; i = i + 1 {
-    let char_a = self[i]
-    let char_b = other[i]
+    let char_a = a[i]
+    let char_b = b[i]
     if char_a < char_b {
       return -1
     } else if char_a > char_b {
@@ -41,7 +41,7 @@ pub fn LabelEncoder::new() -> LabelEncoder {
 ///|
 /// 拟合标签数据
 /// @param labels 标签数组
-pub fn fit(self : LabelEncoder, labels : Array[String]) -> Unit {
+pub fn LabelEncoder::fit(self : LabelEncoder, labels : Array[String]) -> Unit {
   if labels.length() == 0 {
     abort("标签不能为空")
   }
@@ -66,7 +66,7 @@ pub fn fit(self : LabelEncoder, labels : Array[String]) -> Unit {
   for i = 0; i < unique_list.length(); i = i + 1 {
     self.classes[i] = unique_list[i]
   }
-  self.classes.sort_by(fn(a, b) { a.compare(b) })
+  self.classes.sort_by(fn(a, b) { compare_strings(a, b) })
 
   // 构建映射
   self.class_to_index = Map::new()
@@ -80,7 +80,10 @@ pub fn fit(self : LabelEncoder, labels : Array[String]) -> Unit {
 /// 转换标签为整数
 /// @param labels 待转换的标签
 /// @return 整数编码
-pub fn transform(self : LabelEncoder, labels : Array[String]) -> Array[Int] {
+pub fn LabelEncoder::transform(
+  self : LabelEncoder,
+  labels : Array[String],
+) -> Array[Int] {
   if not(self.fitted) {
     abort("必须先调用 fit() 方法")
   }
@@ -96,14 +99,17 @@ pub fn transform(self : LabelEncoder, labels : Array[String]) -> Array[Int] {
 
 ///|
 /// 拟合并转换
-pub fn fit_transform(self : LabelEncoder, labels : Array[String]) -> Array[Int] {
+pub fn LabelEncoder::fit_transform(
+  self : LabelEncoder,
+  labels : Array[String],
+) -> Array[Int] {
   self.fit(labels)
   self.transform(labels)
 }
 
 ///|
 /// 反转换（整数转回标签）
-pub fn inverse_transform(
+pub fn LabelEncoder::inverse_transform(
   self : LabelEncoder,
   encoded : Array[Int],
 ) -> Array[String] {
@@ -122,7 +128,7 @@ pub fn inverse_transform(
 
 ///|
 /// 获取所有类别
-pub fn get_classes(self : LabelEncoder) -> Array[String] {
+pub fn LabelEncoder::get_classes(self : LabelEncoder) -> Array[String] {
   self.classes
 }
 
@@ -142,7 +148,10 @@ pub fn OneHotEncoder::new() -> OneHotEncoder {
 ///|
 /// 拟合数据
 /// @param data 数据，每行是一个样本，每列是一个特征
-pub fn fit(self : OneHotEncoder, data : Array[Array[String]]) -> Unit {
+pub fn OneHotEncoder::fit(
+  self : OneHotEncoder,
+  data : Array[Array[String]],
+) -> Unit {
   if data.length() == 0 {
     abort("数据不能为空")
   }
@@ -171,7 +180,7 @@ pub fn fit(self : OneHotEncoder, data : Array[Array[String]]) -> Unit {
     for k = 0; k < unique_list.length(); k = k + 1 {
       categories_array[k] = unique_list[k]
     }
-    categories_array.sort_by(fn(a, b) { a.compare(b) })
+    categories_array.sort_by(fn(a, b) { compare_strings(a, b) })
     self.categories[i] = categories_array
   }
   self.fitted = true
@@ -181,7 +190,7 @@ pub fn fit(self : OneHotEncoder, data : Array[Array[String]]) -> Unit {
 /// 转换数据为独热编码
 /// @param data 待转换的数据
 /// @return 独热编码后的数据（0.0 或 1.0）
-pub fn transform(
+pub fn OneHotEncoder::transform(
   self : OneHotEncoder,
   data : Array[Array[String]],
 ) -> Array[Array[Double]] {
@@ -216,7 +225,7 @@ pub fn transform(
 
 ///|
 /// 拟合并转换
-pub fn fit_transform(
+pub fn OneHotEncoder::fit_transform(
   self : OneHotEncoder,
   data : Array[Array[String]],
 ) -> Array[Array[Double]] {
@@ -226,7 +235,7 @@ pub fn fit_transform(
 
 ///|
 /// 获取特征名称（用于理解编码后的列）
-pub fn get_feature_names(self : OneHotEncoder) -> Array[String] {
+pub fn OneHotEncoder::get_feature_names(self : OneHotEncoder) -> Array[String] {
   if not(self.fitted) {
     abort("必须先调用 fit() 方法")
   }
@@ -270,7 +279,7 @@ pub fn Binarizer::new(threshold? : Double = 0.0) -> Binarizer {
 
 ///|
 /// 转换数据（二值化不需要拟合）
-pub fn transform(
+pub fn Binarizer::transform(
   self : Binarizer,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -289,7 +298,7 @@ pub fn transform(
 
 ///|
 /// 拟合并转换
-pub fn fit_transform(
+pub fn Binarizer::fit_transform(
   self : Binarizer,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {

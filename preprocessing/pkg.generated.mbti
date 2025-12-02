@@ -43,11 +43,6 @@ pub(all) enum NormType {
   L2
   Max
 }
-fn NormType::equal(Self, Self) -> Bool // from trait `Eq`
-#deprecated
-fn NormType::op_equal(Self, Self) -> Bool // from trait `Eq`
-fn NormType::output(Self, &Logger) -> Unit // from trait `Show`
-fn NormType::to_string(Self) -> String // from trait `Show`
 impl Eq for NormType
 impl Show for NormType
 
