@@ -36,8 +36,16 @@ pub struct SGDClassifier {
 }
 
 ///|
+/// 损失函数类型
+pub(all) enum LossFunction {
+  Hinge // SVM 损失
+  Log // 逻辑损失
+  Perceptron // 感知机损失
+}
+
+///|
 /// 校验标签是否为二元 {0, 1}
-fn validate_binary_labels(y : @math.Vector) -> Unit {
+fn assert_binary_labels(y : @math.Vector) -> Unit {
   for i = 0; i < y.size(); i = i + 1 {
     let val = y.get(i)
     if not(val == 0.0 || val == 1.0) {
@@ -47,15 +55,25 @@ fn validate_binary_labels(y : @math.Vector) -> Unit {
 }
 
 ///|
-/// 损失函数类型
-pub(all) enum LossFunction {
-  Hinge // SVM 损失
-  Log // 逻辑损失
-  Perceptron // 感知机损失
+/// 保证 X 与 y 对齐，返回样本数与特征数
+fn ensure_xy_aligned(x : @math.Matrix, y : @math.Vector) -> (Int, Int) {
+  let (n_samples, n_features) = x.shape()
+  if y.size() != n_samples {
+    abort("X 和 y 的样本数不一致")
+  }
+  (n_samples, n_features)
 }
 
 ///|
-/// ========== 逻辑回归 ==========
+/// 预测或打分前的简单 guard
+fn ensure_fitted(is_fitted : Bool) -> Unit {
+  if not(is_fitted) {
+    abort("先调用 fit 再进行预测或评分")
+  }
+}
+
+///|
+/// 逻辑回归
 
 ///|
 pub fn LogisticRegression::new(
@@ -95,11 +113,9 @@ pub fn LogisticRegression::fit(
   x : @math.Matrix,
   y : @math.Vector,
 ) -> Unit {
-  let (n_samples, n_features) = x.shape()
-  if y.size() != n_samples {
-    abort("X 和 y 的样本数不匹配")
-  }
-  validate_binary_labels(y)
+  let (n_samples, n_features) = ensure_xy_aligned(x, y)
+  assert_binary_labels(y)
+  let n = n_samples.to_double()
 
   // 初始化权重
   self.weights = @math.Vector::zeros(n_features)
@@ -129,12 +145,10 @@ pub fn LogisticRegression::fit(
 
     // 更新权重
     for j = 0; j < n_features; j = j + 1 {
-      let w_j = self.weights.get(j) -
-        self.learning_rate * grad_w.get(j) / n_samples.to_double()
+      let w_j = self.weights.get(j) - self.learning_rate * grad_w.get(j) / n
       self.weights.set(j, w_j)
     }
-    self.intercept = self.intercept -
-      self.learning_rate * grad_b / n_samples.to_double()
+    self.intercept = self.intercept - self.learning_rate * grad_b / n
 
     // 检查收敛（简化版）
     if grad_w.norm_l2() < self.tol {
@@ -150,9 +164,7 @@ pub fn LogisticRegression::predict_proba(
   self : LogisticRegression,
   x : @math.Matrix,
 ) -> @math.Vector {
-  if not(self.is_fitted) {
-    abort("模型尚未训练")
-  }
+  ensure_fitted(self.is_fitted)
   let (n_samples, _) = x.shape()
   let probas = Array::make(n_samples, 0.0)
   for i = 0; i < n_samples; i = i + 1 {
@@ -189,7 +201,7 @@ pub fn LogisticRegression::score(
 }
 
 ///|
-/// ========== 感知机 ==========
+/// 感知机
 
 ///|
 pub fn Perceptron::new(learning_rate : Double, max_iter : Int) -> Perceptron {
@@ -215,11 +227,8 @@ pub fn Perceptron::fit(
   x : @math.Matrix,
   y : @math.Vector,
 ) -> Unit {
-  let (n_samples, n_features) = x.shape()
-  if y.size() != n_samples {
-    abort("X 和 y 的样本数不匹配")
-  }
-  validate_binary_labels(y)
+  let (n_samples, n_features) = ensure_xy_aligned(x, y)
+  assert_binary_labels(y)
 
   // 初始化权重
   self.weights = @math.Vector::zeros(n_features)
@@ -257,9 +266,7 @@ pub fn Perceptron::fit(
 ///|
 /// 预测
 pub fn Perceptron::predict(self : Perceptron, x : @math.Matrix) -> @math.Vector {
-  if not(self.is_fitted) {
-    abort("模型尚未训练")
-  }
+  ensure_fitted(self.is_fitted)
   let (n_samples, _) = x.shape()
   let predictions = Array::make(n_samples, 0.0)
   for i = 0; i < n_samples; i = i + 1 {
@@ -281,7 +288,7 @@ pub fn Perceptron::score(
 }
 
 ///|
-/// ========== 随机梯度下降分类器 ==========
+/// 随机梯度下降分类器
 
 ///|
 pub fn SGDClassifier::new(
@@ -317,11 +324,8 @@ pub fn SGDClassifier::fit(
   x : @math.Matrix,
   y : @math.Vector,
 ) -> Unit {
-  let (n_samples, n_features) = x.shape()
-  if y.size() != n_samples {
-    abort("X 和 y 的样本数不匹配")
-  }
-  validate_binary_labels(y)
+  let (n_samples, n_features) = ensure_xy_aligned(x, y)
+  assert_binary_labels(y)
 
   // 初始化权重
   self.weights = @math.Vector::zeros(n_features)
@@ -386,9 +390,7 @@ pub fn SGDClassifier::predict(
   self : SGDClassifier,
   x : @math.Matrix,
 ) -> @math.Vector {
-  if not(self.is_fitted) {
-    abort("模型尚未训练")
-  }
+  ensure_fitted(self.is_fitted)
   let (n_samples, _) = x.shape()
   let predictions = Array::make(n_samples, 0.0)
   for i = 0; i < n_samples; i = i + 1 {
@@ -425,7 +427,7 @@ pub fn SGDClassifier::score(
 }
 
 ///|
-/// ========== 辅助函数 ==========
+/// 辅助函数
 
 ///|
 /// 计算准确率
