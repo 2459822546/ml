@@ -1,0 +1,56 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/tree"
+
+import(
+  "2459822546/ml/math"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct DecisionTreeClassifier {
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+  mut features : Array[Int]
+  mut thresholds : Array[Double]
+  mut left : Array[Int]
+  mut right : Array[Int]
+  mut predictions : Array[Double]
+  mut is_leaf : Array[Bool]
+  mut feature_importances : Array[Double]
+  mut n_features : Int
+  mut classes : Array[Double]
+  mut is_fitted : Bool
+}
+fn DecisionTreeClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn DecisionTreeClassifier::get_feature_importances(Self) -> @math.Vector
+fn DecisionTreeClassifier::new(max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int) -> Self
+fn DecisionTreeClassifier::predict(Self, @math.Matrix) -> @math.Vector
+fn DecisionTreeClassifier::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct RandomForestClassifier {
+  n_estimators : Int
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+  max_features : Int
+  seed : Int
+  mut trees : Array[DecisionTreeClassifier]
+  mut feature_subsets : Array[Array[Int]]
+  mut classes : Array[Double]
+  mut n_features : Int
+  mut is_fitted : Bool
+}
+fn RandomForestClassifier::feature_importances(Self) -> @math.Vector
+fn RandomForestClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn RandomForestClassifier::new(n_estimators? : Int, max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int, max_features? : Int, seed? : Int) -> Self
+fn RandomForestClassifier::predict(Self, @math.Matrix) -> @math.Vector
+fn RandomForestClassifier::score(Self, @math.Matrix, @math.Vector) -> Double
+
+// Type aliases
+
+// Traits
+
