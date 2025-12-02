@@ -52,3 +52,36 @@ test "rfe_linear_regression drops smallest weight feature" {
   assert_true(has0)
   assert_true(has1)
 }
+
+///|
+test "mutual_information_scores handles constant feature" {
+  let x = @math.Matrix::new([[1.0, 5.0], [1.0, 6.0], [1.0, 7.0]])
+  let y = @math.Vector::new([0.0, 0.0, 1.0])
+  let scores = mutual_information_scores(x, y, n_bins=5)
+  assert_eq(scores.length(), 2)
+  // 第一列常数，互信息应为 0
+  assert_eq(scores[0], 0.0)
+  assert_true(scores[1] >= 0.0)
+}
+
+///|
+test "panic_variance_threshold_negative" {
+  let _ = variance_threshold(@math.Matrix::new([[1.0]]), -1.0)
+
+}
+
+///|
+test "panic_correlation_filter_threshold_out_of_range" {
+  let _ = correlation_filter(@math.Matrix::new([[1.0, 2.0]]), 1.5)
+
+}
+
+///|
+test "panic_mutual_information_length_mismatch" {
+  let _ = mutual_information_scores(
+    @math.Matrix::new([[1.0], [2.0]]),
+    @math.Vector::new([0.0]),
+    n_bins=2,
+  )
+
+}
