@@ -115,6 +115,18 @@ test "Normalizer - Max 范数" {
 }
 
 ///|
+test "Normalizer - fit_transform also normalizes" {
+  let normalizer = Normalizer::new(norm=L2)
+  let data = [[0.0, 0.0], [1.0, 0.0]]
+  let transformed = normalizer.fit_transform(data)
+  // 第一行全零，第二行范数应为 1
+  assert_eq(transformed.length(), 2)
+  let norm = (transformed[1][0] * transformed[1][0] +
+  transformed[1][1] * transformed[1][1]).sqrt()
+  assert_true((norm - 1.0).abs() < 1.0e-9)
+}
+
+///|
 /// RobustScaler 测试
 test "RobustScaler - 基本功能" {
   let scaler = RobustScaler::new()
@@ -138,4 +150,17 @@ test "RobustScaler - 拟合转换" {
   let transformed = scaler.fit_transform(data)
   assert_eq(transformed.length(), 5)
   assert_eq(transformed[0].length(), 2)
+}
+
+///|
+test "RobustScaler - handles zero IQR by fallback" {
+  let scaler = RobustScaler::new()
+  let data = [[1.0, 5.0], [1.0, 5.0], [1.0, 5.0]]
+  let transformed = scaler.fit_transform(data)
+  // 所有值相同，IQR 为 0，会 fallback 为 1，输出应为 0
+  for i = 0; i < transformed.length(); i = i + 1 {
+    for j = 0; j < transformed[i].length(); j = j + 1 {
+      assert_eq(transformed[i][j], 0.0)
+    }
+  }
 }
