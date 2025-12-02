@@ -1,0 +1,67 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/clustering"
+
+import(
+  "2459822546/ml/math"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct AgglomerativeClustering {
+  n_clusters : Int
+  linkage : LinkageMethod
+  mut labels : Array[Int]
+  mut is_fitted : Bool
+}
+fn AgglomerativeClustering::fit(Self, @math.Matrix) -> Unit
+fn AgglomerativeClustering::fit_predict(Self, @math.Matrix) -> Array[Int]
+fn AgglomerativeClustering::get_labels(Self) -> Array[Int]
+fn AgglomerativeClustering::new(Int, LinkageMethod) -> Self
+
+pub struct DBSCAN {
+  eps : Double
+  min_samples : Int
+  mut labels : Array[Int]
+  mut is_fitted : Bool
+}
+fn DBSCAN::fit(Self, @math.Matrix) -> Unit
+fn DBSCAN::fit_predict(Self, @math.Matrix) -> Array[Int]
+fn DBSCAN::get_labels(Self) -> Array[Int]
+fn DBSCAN::get_n_clusters(Self) -> Int
+fn DBSCAN::new(Double, Int) -> Self
+
+pub(all) enum InitMethod {
+  Random
+  KMeansPlusPlus
+}
+
+pub struct KMeans {
+  n_clusters : Int
+  max_iter : Int
+  tol : Double
+  init_method : InitMethod
+  mut centers : @math.Matrix
+  mut labels : Array[Int]
+  mut inertia : Double
+  mut is_fitted : Bool
+}
+fn KMeans::fit(Self, @math.Matrix) -> Unit
+fn KMeans::fit_predict(Self, @math.Matrix) -> Array[Int]
+fn KMeans::get_centers(Self) -> @math.Matrix
+fn KMeans::get_inertia(Self) -> Double
+fn KMeans::new(Int, Int, Double, InitMethod) -> Self
+fn KMeans::predict(Self, @math.Matrix) -> Array[Int]
+
+pub(all) enum LinkageMethod {
+  Single
+  Complete
+  Average
+}
+
+// Type aliases
+
+// Traits
+
