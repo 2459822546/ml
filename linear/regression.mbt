@@ -51,6 +51,15 @@ pub fn LinearRegression::new() -> LinearRegression {
 }
 
 ///|
+/// 获取权重（需先训练）
+pub fn LinearRegression::get_weights(self : LinearRegression) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  self.weights
+}
+
+///|
 /// 训练线性回归模型（使用正规方程）
 /// X: n_samples x n_features
 /// y: n_samples

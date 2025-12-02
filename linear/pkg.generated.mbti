@@ -43,6 +43,7 @@ pub struct LinearRegression {
   mut is_fitted : Bool
 }
 fn LinearRegression::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn LinearRegression::get_weights(Self) -> @math.Vector
 fn LinearRegression::new() -> Self
 fn LinearRegression::predict(Self, @math.Matrix) -> @math.Vector
 fn LinearRegression::score(Self, @math.Matrix, @math.Vector) -> Double
