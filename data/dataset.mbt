@@ -7,25 +7,43 @@ pub struct Dataset {
 }
 
 ///|
+/// 校验特征矩阵的维度，并确保标签数量一致
+fn validate_features_and_labels(
+  features : Array[Array[Double]],
+  labels : Array[Double],
+) -> Unit {
+  if features.length() != labels.length() {
+    abort("特征和标签的样本数不匹配")
+  }
+  if features.length() == 0 {
+    return
+  }
+  let expected_dim = features[0].length()
+  for i = 0; i < features.length(); i = i + 1 {
+    if features[i].length() != expected_dim {
+      abort("样本 \{i} 的特征维度不一致")
+    }
+  }
+}
+
+///|
 pub fn Dataset::new(
   features : Array[Array[Double]],
   labels : Array[Double],
 ) -> Dataset {
-  if features.length() != labels.length() {
-    abort("特征和标签的样本数不匹配")
-  }
+  validate_features_and_labels(features, labels)
   { features, labels }
 }
 
 ///|
 /// 获取样本数量
-pub fn len(self : Dataset) -> Int {
+pub fn Dataset::len(self : Dataset) -> Int {
   self.features.length()
 }
 
 ///|
 /// 获取特征维度
-pub fn n_features(self : Dataset) -> Int {
+pub fn Dataset::n_features(self : Dataset) -> Int {
   if self.len() == 0 {
     0
   } else {
@@ -35,7 +53,7 @@ pub fn n_features(self : Dataset) -> Int {
 
 ///|
 /// 获取指定索引的样本
-pub fn get(self : Dataset, index : Int) -> (Array[Double], Double) {
+pub fn Dataset::get(self : Dataset, index : Int) -> (Array[Double], Double) {
   if index < 0 || index >= self.len() {
     abort("索引越界")
   }
@@ -44,19 +62,19 @@ pub fn get(self : Dataset, index : Int) -> (Array[Double], Double) {
 
 ///|
 /// 获取所有特征
-pub fn get_features(self : Dataset) -> Array[Array[Double]] {
+pub fn Dataset::get_features(self : Dataset) -> Array[Array[Double]] {
   self.features
 }
 
 ///|
 /// 获取所有标签
-pub fn get_labels(self : Dataset) -> Array[Double] {
+pub fn Dataset::get_labels(self : Dataset) -> Array[Double] {
   self.labels
 }
 
 ///|
 /// 获取指定范围的子集
-pub fn slice(self : Dataset, start : Int, end : Int) -> Dataset {
+pub fn Dataset::slice(self : Dataset, start : Int, end : Int) -> Dataset {
   if start < 0 || start >= self.len() {
     abort("起始索引越界")
   }
@@ -84,9 +102,10 @@ pub fn train_test_split(
   random_seed? : Int = 42,
 ) -> (Dataset, Dataset) {
   let n_samples = features.length()
-  if n_samples != labels.length() {
-    abort("特征和标签的样本数不匹配")
+  if n_samples == 0 {
+    abort("特征不能为空")
   }
+  validate_features_and_labels(features, labels)
   if test_size <= 0.0 || test_size >= 1.0 {
     abort("test_size 必须在 (0, 1) 之间")
   }
@@ -133,9 +152,10 @@ pub fn k_fold_split(
   n_splits : Int,
 ) -> Array[(Dataset, Dataset)] {
   let n_samples = features.length()
-  if n_samples != labels.length() {
-    abort("特征和标签的样本数不匹配")
+  if n_samples == 0 {
+    abort("特征不能为空")
   }
+  validate_features_and_labels(features, labels)
   if n_splits <= 1 || n_splits > n_samples {
     abort("n_splits 必须在 (1, n_samples] 之间")
   }
