@@ -34,3 +34,27 @@ test "RandomForestClassifier majority vote" {
   assert_eq(imp.size(), 2)
   assert_true(imp.get(0) >= 0.0)
 }
+
+///|
+test "panic_rf_predict_not_fitted" {
+  let rf = RandomForestClassifier::new()
+  let _ = rf.predict(@math.Matrix::new([[1.0]]))
+
+}
+
+///|
+test "panic_rf_feature_importances_not_fitted" {
+  let rf = RandomForestClassifier::new()
+  let _ = rf.feature_importances()
+
+}
+
+///|
+test "panic_rf_score_length_mismatch" {
+  let rf = RandomForestClassifier::new()
+  let x = @math.Matrix::new([[1.0, 1.0], [2.0, 2.0]])
+  let y = @math.Vector::new([0.0, 1.0])
+  rf.fit(x, y)
+  let _ = rf.score(x, @math.Vector::new([0.0]))
+
+}
