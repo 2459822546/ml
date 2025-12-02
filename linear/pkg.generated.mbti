@@ -68,6 +68,19 @@ pub(all) enum LossFunction {
   Perceptron
 }
 
+pub struct OneVsRestClassifier {
+  learning_rate : Double
+  max_iter : Int
+  tol : Double
+  mut classes : Array[Double]
+  mut models : Array[LogisticRegression]
+  mut is_fitted : Bool
+}
+fn OneVsRestClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn OneVsRestClassifier::new(learning_rate? : Double, max_iter? : Int, tol? : Double) -> Self
+fn OneVsRestClassifier::predict(Self, @math.Matrix) -> @math.Vector
+fn OneVsRestClassifier::score(Self, @math.Matrix, @math.Vector) -> Double
+
 pub struct Perceptron {
   mut weights : @math.Vector
   mut intercept : Double
