@@ -73,6 +73,19 @@ fn LinearRegression::new() -> Self
 fn LinearRegression::predict(Self, @math.Matrix) -> @math.Vector
 fn LinearRegression::score(Self, @math.Matrix, @math.Vector) -> Double
 
+pub struct LinearSVM {
+  mut weights : @math.Vector
+  mut intercept : Double
+  mut is_fitted : Bool
+  c : Double
+  learning_rate : Double
+  max_iter : Int
+}
+fn LinearSVM::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn LinearSVM::new(c? : Double, learning_rate? : Double, max_iter? : Int) -> Self
+fn LinearSVM::predict(Self, @math.Matrix) -> @math.Vector
+fn LinearSVM::score(Self, @math.Matrix, @math.Vector) -> Double
+
 pub struct LogisticRegression {
   mut weights : @math.Vector
   mut intercept : Double
