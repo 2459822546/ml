@@ -79,5 +79,3 @@ test "Matrix - 统计函数" {
   assert_eq(col_sums.get(1), 7.0)
   assert_eq(col_sums.get(2), 9.0)
 }
-
-

@@ -110,7 +110,6 @@ pub struct Tensor {
   strides : Array[Int]
   size : Int
 }
-fn Tensor::add(Self, Self) -> Self // from trait `Add`
 fn Tensor::copy(Self) -> Self
 fn Tensor::fill(Array[Int], Double) -> Self
 fn Tensor::flatten(Self) -> Self
@@ -123,7 +122,6 @@ fn Tensor::map(Self, (Double) -> Double) -> Self
 fn Tensor::max(Self) -> Double
 fn Tensor::mean(Self) -> Double
 fn Tensor::min(Self) -> Double
-fn Tensor::mul(Self, Self) -> Self // from trait `Mul`
 fn Tensor::ndim(Self) -> Int
 fn Tensor::new(Array[Double], Array[Int]) -> Self
 fn Tensor::ones(Array[Int]) -> Self
@@ -133,7 +131,6 @@ fn Tensor::op_sub(Self, Self) -> Self
 fn Tensor::reshape(Self, Array[Int]) -> Self
 fn Tensor::scalar_mul(Self, Double) -> Self
 fn Tensor::set(Self, Array[Int], Double) -> Unit
-fn Tensor::sub(Self, Self) -> Self // from trait `Sub`
 fn Tensor::sum(Self) -> Double
 fn Tensor::sum_axis(Self, Int) -> Self
 fn Tensor::to_matrix(Self) -> Matrix

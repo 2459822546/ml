@@ -81,23 +81,23 @@ pub fn Tensor::from_matrix(mat : Matrix) -> Tensor {
 
 ///|
 /// 基本属性
-pub fn get_shape(self : Tensor) -> Array[Int] {
+pub fn Tensor::get_shape(self : Tensor) -> Array[Int] {
   self.shape
 }
 
 ///|
-pub fn ndim(self : Tensor) -> Int {
+pub fn Tensor::ndim(self : Tensor) -> Int {
   self.shape.length()
 }
 
 ///|
-pub fn total_size(self : Tensor) -> Int {
+pub fn Tensor::total_size(self : Tensor) -> Int {
   self.size
 }
 
 ///|
 /// 计算多维索引对应的扁平化索引
-fn compute_flat_index(self : Tensor, indices : Array[Int]) -> Int {
+fn Tensor::compute_flat_index(self : Tensor, indices : Array[Int]) -> Int {
   if indices.length() != self.shape.length() {
     abort("索引维度不匹配")
   }
@@ -112,13 +112,13 @@ fn compute_flat_index(self : Tensor, indices : Array[Int]) -> Int {
 }
 
 ///|
-pub fn get(self : Tensor, indices : Array[Int]) -> Double {
+pub fn Tensor::get(self : Tensor, indices : Array[Int]) -> Double {
   let idx = self.compute_flat_index(indices)
   self.data[idx]
 }
 
 ///|
-pub fn set(self : Tensor, indices : Array[Int], value : Double) -> Unit {
+pub fn Tensor::set(self : Tensor, indices : Array[Int], value : Double) -> Unit {
   let idx = self.compute_flat_index(indices)
   self.data[idx] = value
 }
@@ -127,7 +127,7 @@ pub fn set(self : Tensor, indices : Array[Int], value : Double) -> Unit {
 
 ///|
 /// 张量加法
-pub fn op_add(self : Tensor, other : Tensor) -> Tensor {
+pub fn Tensor::op_add(self : Tensor, other : Tensor) -> Tensor {
   if not(self.shapes_equal(other)) {
     abort("张量形状不匹配")
   }
@@ -140,7 +140,7 @@ pub fn op_add(self : Tensor, other : Tensor) -> Tensor {
 
 ///|
 /// 张量减法
-pub fn op_sub(self : Tensor, other : Tensor) -> Tensor {
+pub fn Tensor::op_sub(self : Tensor, other : Tensor) -> Tensor {
   if not(self.shapes_equal(other)) {
     abort("张量形状不匹配")
   }
@@ -153,7 +153,7 @@ pub fn op_sub(self : Tensor, other : Tensor) -> Tensor {
 
 ///|
 /// 标量乘法
-pub fn scalar_mul(self : Tensor, scalar : Double) -> Tensor {
+pub fn Tensor::scalar_mul(self : Tensor, scalar : Double) -> Tensor {
   let result_data = Array::make(self.size, 0.0)
   for i = 0; i < self.size; i = i + 1 {
     result_data[i] = self.data[i] * scalar
@@ -163,7 +163,7 @@ pub fn scalar_mul(self : Tensor, scalar : Double) -> Tensor {
 
 ///|
 /// 元素级乘法 (Hadamard product) - 用于 * 运算符
-pub fn op_mul(self : Tensor, other : Tensor) -> Tensor {
+pub fn Tensor::op_mul(self : Tensor, other : Tensor) -> Tensor {
   if not(self.shapes_equal(other)) {
     abort("张量形状不匹配")
   }
@@ -176,7 +176,7 @@ pub fn op_mul(self : Tensor, other : Tensor) -> Tensor {
 
 ///|
 /// Hadamard 积的别名（保持API一致性）
-pub fn hadamard(self : Tensor, other : Tensor) -> Tensor {
+pub fn Tensor::hadamard(self : Tensor, other : Tensor) -> Tensor {
   self.op_mul(other)
 }
 
@@ -202,7 +202,7 @@ pub impl Mul for Tensor with mul(self, other) {
 
 ///|
 /// 重塑张量
-pub fn reshape(self : Tensor, new_shape : Array[Int]) -> Tensor {
+pub fn Tensor::reshape(self : Tensor, new_shape : Array[Int]) -> Tensor {
   let mut new_size = 1
   for i = 0; i < new_shape.length(); i = i + 1 {
     new_size = new_size * new_shape[i]
@@ -221,7 +221,7 @@ pub fn reshape(self : Tensor, new_shape : Array[Int]) -> Tensor {
 
 ///|
 /// 转置（只支持2D）
-pub fn transpose(self : Tensor) -> Tensor {
+pub fn Tensor::transpose(self : Tensor) -> Tensor {
   if self.ndim() != 2 {
     abort("转置只支持2D张量")
   }
@@ -240,7 +240,7 @@ pub fn transpose(self : Tensor) -> Tensor {
 
 ///|
 /// 展平为1D张量
-pub fn flatten(self : Tensor) -> Tensor {
+pub fn Tensor::flatten(self : Tensor) -> Tensor {
   let new_data = Array::make(self.size, 0.0)
   for i = 0; i < self.size; i = i + 1 {
     new_data[i] = self.data[i]
@@ -250,7 +250,7 @@ pub fn flatten(self : Tensor) -> Tensor {
 
 ///|
 /// 沿指定轴求和
-pub fn sum_axis(self : Tensor, axis : Int) -> Tensor {
+pub fn Tensor::sum_axis(self : Tensor, axis : Int) -> Tensor {
   if axis < 0 || axis >= self.ndim() {
     abort("轴索引越界")
   }
@@ -307,7 +307,7 @@ pub fn sum_axis(self : Tensor, axis : Int) -> Tensor {
 
 ///|
 /// 求和
-pub fn sum(self : Tensor) -> Double {
+pub fn Tensor::sum(self : Tensor) -> Double {
   let mut total = 0.0
   for i = 0; i < self.size; i = i + 1 {
     total = total + self.data[i]
@@ -317,7 +317,7 @@ pub fn sum(self : Tensor) -> Double {
 
 ///|
 /// 均值
-pub fn mean(self : Tensor) -> Double {
+pub fn Tensor::mean(self : Tensor) -> Double {
   if self.size == 0 {
     abort("空张量没有均值")
   }
@@ -326,7 +326,7 @@ pub fn mean(self : Tensor) -> Double {
 
 ///|
 /// 最小值
-pub fn min(self : Tensor) -> Double {
+pub fn Tensor::min(self : Tensor) -> Double {
   if self.size == 0 {
     abort("空张量没有最小值")
   }
@@ -341,7 +341,7 @@ pub fn min(self : Tensor) -> Double {
 
 ///|
 /// 最大值
-pub fn max(self : Tensor) -> Double {
+pub fn Tensor::max(self : Tensor) -> Double {
   if self.size == 0 {
     abort("空张量没有最大值")
   }
@@ -358,7 +358,7 @@ pub fn max(self : Tensor) -> Double {
 
 ///|
 /// 检查形状是否相等
-fn shapes_equal(self : Tensor, other : Tensor) -> Bool {
+fn Tensor::shapes_equal(self : Tensor, other : Tensor) -> Bool {
   if self.shape.length() != other.shape.length() {
     return false
   }
@@ -372,7 +372,7 @@ fn shapes_equal(self : Tensor, other : Tensor) -> Bool {
 
 ///|
 /// 复制张量
-pub fn copy(self : Tensor) -> Tensor {
+pub fn Tensor::copy(self : Tensor) -> Tensor {
   let new_data = Array::make(self.size, 0.0)
   for i = 0; i < self.size; i = i + 1 {
     new_data[i] = self.data[i]
@@ -382,7 +382,7 @@ pub fn copy(self : Tensor) -> Tensor {
 
 ///|
 /// 应用函数到每个元素
-pub fn map(self : Tensor, f : (Double) -> Double) -> Tensor {
+pub fn Tensor::map(self : Tensor, f : (Double) -> Double) -> Tensor {
   let result_data = Array::make(self.size, 0.0)
   for i = 0; i < self.size; i = i + 1 {
     result_data[i] = f(self.data[i])
@@ -392,7 +392,7 @@ pub fn map(self : Tensor, f : (Double) -> Double) -> Tensor {
 
 ///|
 /// 转换为 Vector (仅1D张量)
-pub fn to_vector(self : Tensor) -> Vector {
+pub fn Tensor::to_vector(self : Tensor) -> Vector {
   if self.ndim() != 1 {
     abort("只有1D张量可以转换为向量")
   }
@@ -401,7 +401,7 @@ pub fn to_vector(self : Tensor) -> Vector {
 
 ///|
 /// 转换为 Matrix (仅2D张量)
-pub fn to_matrix(self : Tensor) -> Matrix {
+pub fn Tensor::to_matrix(self : Tensor) -> Matrix {
   if self.ndim() != 2 {
     abort("只有2D张量可以转换为矩阵")
   }

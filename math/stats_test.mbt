@@ -80,5 +80,3 @@ test "Stats - 余弦相似度" {
   let sim2 = cosine_similarity(x2, y2)
   assert_true(sim2.abs() < 0.0001)
 }
-
-

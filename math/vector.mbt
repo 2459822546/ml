@@ -33,22 +33,22 @@ pub fn Vector::fill(size : Int, value : Double) -> Vector {
 
 ///|
 /// 基本属性
-pub fn size(self : Vector) -> Int {
+pub fn Vector::size(self : Vector) -> Int {
   self.data.length()
 }
 
 ///|
-pub fn get(self : Vector, index : Int) -> Double {
+pub fn Vector::get(self : Vector, index : Int) -> Double {
   self.data[index]
 }
 
 ///|
-pub fn set(self : Vector, index : Int, value : Double) -> Unit {
+pub fn Vector::set(self : Vector, index : Int, value : Double) -> Unit {
   self.data[index] = value
 }
 
 ///|
-pub fn to_array(self : Vector) -> Array[Double] {
+pub fn Vector::to_array(self : Vector) -> Array[Double] {
   self.data
 }
 
@@ -56,7 +56,7 @@ pub fn to_array(self : Vector) -> Array[Double] {
 
 ///|
 /// 向量加法
-pub fn op_add(self : Vector, other : Vector) -> Vector {
+pub fn Vector::op_add(self : Vector, other : Vector) -> Vector {
   if self.size() != other.size() {
     abort("向量维度不匹配")
   }
@@ -69,7 +69,7 @@ pub fn op_add(self : Vector, other : Vector) -> Vector {
 
 ///|
 /// 向量减法
-pub fn op_sub(self : Vector, other : Vector) -> Vector {
+pub fn Vector::op_sub(self : Vector, other : Vector) -> Vector {
   if self.size() != other.size() {
     abort("向量维度不匹配")
   }
@@ -82,7 +82,7 @@ pub fn op_sub(self : Vector, other : Vector) -> Vector {
 
 ///|
 /// 标量乘法
-pub fn op_mul(self : Vector, scalar : Double) -> Vector {
+pub fn Vector::op_mul(self : Vector, scalar : Double) -> Vector {
   let result = Array::make(self.size(), 0.0)
   for i = 0; i < self.size(); i = i + 1 {
     result[i] = self.data[i] * scalar
@@ -92,7 +92,7 @@ pub fn op_mul(self : Vector, scalar : Double) -> Vector {
 
 ///|
 /// 标量除法
-pub fn op_div(self : Vector, scalar : Double) -> Vector {
+pub fn Vector::op_div(self : Vector, scalar : Double) -> Vector {
   if scalar == 0.0 {
     abort("除数不能为零")
   }
@@ -105,7 +105,7 @@ pub fn op_div(self : Vector, scalar : Double) -> Vector {
 
 ///|
 /// 元素级乘法 (Hadamard product)
-pub fn hadamard(self : Vector, other : Vector) -> Vector {
+pub fn Vector::hadamard(self : Vector, other : Vector) -> Vector {
   if self.size() != other.size() {
     abort("向量维度不匹配")
   }
@@ -118,7 +118,7 @@ pub fn hadamard(self : Vector, other : Vector) -> Vector {
 
 ///|
 /// 点积 (内积)
-pub fn dot(self : Vector, other : Vector) -> Double {
+pub fn Vector::dot(self : Vector, other : Vector) -> Double {
   if self.size() != other.size() {
     abort("向量维度不匹配")
   }
@@ -133,7 +133,7 @@ pub fn dot(self : Vector, other : Vector) -> Double {
 
 ///|
 /// L1 范数 (曼哈顿距离)
-pub fn norm_l1(self : Vector) -> Double {
+pub fn Vector::norm_l1(self : Vector) -> Double {
   let mut sum = 0.0
   for i = 0; i < self.size(); i = i + 1 {
     sum = sum + self.data[i].abs()
@@ -143,13 +143,13 @@ pub fn norm_l1(self : Vector) -> Double {
 
 ///|
 /// L2 范数 (欧几里得范数)
-pub fn norm_l2(self : Vector) -> Double {
+pub fn Vector::norm_l2(self : Vector) -> Double {
   self.dot(self).sqrt()
 }
 
 ///|
 /// 无穷范数 (最大绝对值)
-pub fn norm_inf(self : Vector) -> Double {
+pub fn Vector::norm_inf(self : Vector) -> Double {
   let mut max_val = 0.0
   for i = 0; i < self.size(); i = i + 1 {
     let abs_val = self.data[i].abs()
@@ -162,7 +162,7 @@ pub fn norm_inf(self : Vector) -> Double {
 
 ///|
 /// 归一化向量 (L2)
-pub fn normalize(self : Vector) -> Vector {
+pub fn Vector::normalize(self : Vector) -> Vector {
   let norm = self.norm_l2()
   if norm == 0.0 {
     return self
@@ -174,7 +174,7 @@ pub fn normalize(self : Vector) -> Vector {
 
 ///|
 /// 求和
-pub fn sum(self : Vector) -> Double {
+pub fn Vector::sum(self : Vector) -> Double {
   let mut total = 0.0
   for i = 0; i < self.size(); i = i + 1 {
     total = total + self.data[i]
@@ -184,7 +184,7 @@ pub fn sum(self : Vector) -> Double {
 
 ///|
 /// 均值
-pub fn mean(self : Vector) -> Double {
+pub fn Vector::mean(self : Vector) -> Double {
   if self.size() == 0 {
     abort("空向量没有均值")
   }
@@ -193,7 +193,7 @@ pub fn mean(self : Vector) -> Double {
 
 ///|
 /// 方差
-pub fn variance(self : Vector) -> Double {
+pub fn Vector::variance(self : Vector) -> Double {
   if self.size() == 0 {
     abort("空向量没有方差")
   }
@@ -208,13 +208,13 @@ pub fn variance(self : Vector) -> Double {
 
 ///|
 /// 标准差
-pub fn std(self : Vector) -> Double {
+pub fn Vector::std(self : Vector) -> Double {
   self.variance().sqrt()
 }
 
 ///|
 /// 最小值
-pub fn min(self : Vector) -> Double {
+pub fn Vector::min(self : Vector) -> Double {
   if self.size() == 0 {
     abort("空向量没有最小值")
   }
@@ -229,7 +229,7 @@ pub fn min(self : Vector) -> Double {
 
 ///|
 /// 最大值
-pub fn max(self : Vector) -> Double {
+pub fn Vector::max(self : Vector) -> Double {
   if self.size() == 0 {
     abort("空向量没有最大值")
   }
@@ -246,7 +246,7 @@ pub fn max(self : Vector) -> Double {
 
 ///|
 /// 复制向量
-pub fn copy(self : Vector) -> Vector {
+pub fn Vector::copy(self : Vector) -> Vector {
   let result = Array::make(self.size(), 0.0)
   for i = 0; i < self.size(); i = i + 1 {
     result[i] = self.data[i]
@@ -256,7 +256,7 @@ pub fn copy(self : Vector) -> Vector {
 
 ///|
 /// 应用函数到每个元素
-pub fn map(self : Vector, f : (Double) -> Double) -> Vector {
+pub fn Vector::map(self : Vector, f : (Double) -> Double) -> Vector {
   let result = Array::make(self.size(), 0.0)
   for i = 0; i < self.size(); i = i + 1 {
     result[i] = f(self.data[i])
@@ -276,5 +276,3 @@ pub fn Vector::to_string(self : Vector) -> String {
   }
   str + "]"
 }
-
-

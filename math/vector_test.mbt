@@ -82,5 +82,3 @@ test "Vector - 归一化" {
   assert_true((normalized.get(0) - 0.6).abs() < 0.0001)
   assert_true((normalized.get(1) - 0.8).abs() < 0.0001)
 }
-
-

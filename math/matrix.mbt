@@ -65,27 +65,27 @@ pub fn Matrix::fill(rows : Int, cols : Int, value : Double) -> Matrix {
 
 ///|
 /// 基本属性
-pub fn shape(self : Matrix) -> (Int, Int) {
+pub fn Matrix::shape(self : Matrix) -> (Int, Int) {
   (self.rows, self.cols)
 }
 
 ///|
-pub fn get(self : Matrix, row : Int, col : Int) -> Double {
+pub fn Matrix::get(self : Matrix, row : Int, col : Int) -> Double {
   self.data[row][col]
 }
 
 ///|
-pub fn set(self : Matrix, row : Int, col : Int, value : Double) -> Unit {
+pub fn Matrix::set(self : Matrix, row : Int, col : Int, value : Double) -> Unit {
   self.data[row][col] = value
 }
 
 ///|
-pub fn get_row(self : Matrix, row : Int) -> Vector {
+pub fn Matrix::get_row(self : Matrix, row : Int) -> Vector {
   Vector::new(self.data[row])
 }
 
 ///|
-pub fn get_col(self : Matrix, col : Int) -> Vector {
+pub fn Matrix::get_col(self : Matrix, col : Int) -> Vector {
   let data = Array::make(self.rows, 0.0)
   for i = 0; i < self.rows; i = i + 1 {
     data[i] = self.data[i][col]
@@ -97,7 +97,7 @@ pub fn get_col(self : Matrix, col : Int) -> Vector {
 
 ///|
 /// 矩阵加法
-pub fn op_add(self : Matrix, other : Matrix) -> Matrix {
+pub fn Matrix::op_add(self : Matrix, other : Matrix) -> Matrix {
   if self.rows != other.rows || self.cols != other.cols {
     abort("矩阵维度不匹配")
   }
@@ -114,7 +114,7 @@ pub fn op_add(self : Matrix, other : Matrix) -> Matrix {
 
 ///|
 /// 矩阵减法
-pub fn op_sub(self : Matrix, other : Matrix) -> Matrix {
+pub fn Matrix::op_sub(self : Matrix, other : Matrix) -> Matrix {
   if self.rows != other.rows || self.cols != other.cols {
     abort("矩阵维度不匹配")
   }
@@ -131,7 +131,7 @@ pub fn op_sub(self : Matrix, other : Matrix) -> Matrix {
 
 ///|
 /// 标量乘法
-pub fn op_mul(self : Matrix, scalar : Double) -> Matrix {
+pub fn Matrix::op_mul(self : Matrix, scalar : Double) -> Matrix {
   let result = Array::make(self.rows, [])
   for i = 0; i < self.rows; i = i + 1 {
     let row = Array::make(self.cols, 0.0)
@@ -145,7 +145,7 @@ pub fn op_mul(self : Matrix, scalar : Double) -> Matrix {
 
 ///|
 /// 矩阵乘法
-pub fn matmul(self : Matrix, other : Matrix) -> Matrix {
+pub fn Matrix::matmul(self : Matrix, other : Matrix) -> Matrix {
   if self.cols != other.rows {
     abort(
       "矩阵维度不匹配：(\{self.rows}, \{self.cols}) × (\{other.rows}, \{other.cols})",
@@ -168,7 +168,7 @@ pub fn matmul(self : Matrix, other : Matrix) -> Matrix {
 
 ///|
 /// 矩阵-向量乘法
-pub fn matvec(self : Matrix, vec : Vector) -> Vector {
+pub fn Matrix::matvec(self : Matrix, vec : Vector) -> Vector {
   if self.cols != vec.size() {
     abort("维度不匹配")
   }
@@ -185,7 +185,7 @@ pub fn matvec(self : Matrix, vec : Vector) -> Vector {
 
 ///|
 /// 元素级乘法 (Hadamard product)
-pub fn hadamard(self : Matrix, other : Matrix) -> Matrix {
+pub fn Matrix::hadamard(self : Matrix, other : Matrix) -> Matrix {
   if self.rows != other.rows || self.cols != other.cols {
     abort("矩阵维度不匹配")
   }
@@ -202,7 +202,7 @@ pub fn hadamard(self : Matrix, other : Matrix) -> Matrix {
 
 ///|
 /// 转置
-pub fn transpose(self : Matrix) -> Matrix {
+pub fn Matrix::transpose(self : Matrix) -> Matrix {
   let result = Array::make(self.cols, [])
   for j = 0; j < self.cols; j = j + 1 {
     let row = Array::make(self.rows, 0.0)
@@ -218,7 +218,7 @@ pub fn transpose(self : Matrix) -> Matrix {
 
 ///|
 /// 求和（所有元素）
-pub fn sum(self : Matrix) -> Double {
+pub fn Matrix::sum(self : Matrix) -> Double {
   let mut total = 0.0
   for i = 0; i < self.rows; i = i + 1 {
     for j = 0; j < self.cols; j = j + 1 {
@@ -230,7 +230,7 @@ pub fn sum(self : Matrix) -> Double {
 
 ///|
 /// 按行求和
-pub fn sum_rows(self : Matrix) -> Vector {
+pub fn Matrix::sum_rows(self : Matrix) -> Vector {
   let result = Array::make(self.rows, 0.0)
   for i = 0; i < self.rows; i = i + 1 {
     let mut sum = 0.0
@@ -244,7 +244,7 @@ pub fn sum_rows(self : Matrix) -> Vector {
 
 ///|
 /// 按列求和
-pub fn sum_cols(self : Matrix) -> Vector {
+pub fn Matrix::sum_cols(self : Matrix) -> Vector {
   let result = Array::make(self.cols, 0.0)
   for j = 0; j < self.cols; j = j + 1 {
     let mut sum = 0.0
@@ -258,7 +258,7 @@ pub fn sum_cols(self : Matrix) -> Vector {
 
 ///|
 /// 均值
-pub fn mean(self : Matrix) -> Double {
+pub fn Matrix::mean(self : Matrix) -> Double {
   let total = self.rows * self.cols
   if total == 0 {
     abort("空矩阵没有均值")
@@ -270,7 +270,7 @@ pub fn mean(self : Matrix) -> Double {
 
 ///|
 /// Frobenius 范数
-pub fn norm_frobenius(self : Matrix) -> Double {
+pub fn Matrix::norm_frobenius(self : Matrix) -> Double {
   let mut sum_sq = 0.0
   for i = 0; i < self.rows; i = i + 1 {
     for j = 0; j < self.cols; j = j + 1 {
@@ -285,7 +285,7 @@ pub fn norm_frobenius(self : Matrix) -> Double {
 
 ///|
 /// 复制矩阵
-pub fn copy(self : Matrix) -> Matrix {
+pub fn Matrix::copy(self : Matrix) -> Matrix {
   let result = Array::make(self.rows, [])
   for i = 0; i < self.rows; i = i + 1 {
     let row = Array::make(self.cols, 0.0)
@@ -299,7 +299,7 @@ pub fn copy(self : Matrix) -> Matrix {
 
 ///|
 /// 应用函数到每个元素
-pub fn map(self : Matrix, f : (Double) -> Double) -> Matrix {
+pub fn Matrix::map(self : Matrix, f : (Double) -> Double) -> Matrix {
   let result = Array::make(self.rows, [])
   for i = 0; i < self.rows; i = i + 1 {
     let row = Array::make(self.cols, 0.0)
@@ -330,5 +330,3 @@ pub fn Matrix::to_string(self : Matrix) -> String {
   }
   str + "\n]"
 }
-
-

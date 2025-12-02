@@ -233,5 +233,3 @@ pub fn cosine_similarity(x : Array[Double], y : Array[Double]) -> Double {
   }
   dot_product / denominator
 }
-
-
