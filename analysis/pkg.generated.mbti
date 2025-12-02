@@ -1,0 +1,34 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/analysis"
+
+import(
+  "2459822546/ml/math"
+)
+
+// Values
+fn chi_square_gof(Array[Double], Array[Double]) -> Double
+
+fn correlation_filter(@math.Matrix, Double) -> Array[Int]
+
+fn jarque_bera(Array[Double]) -> Double
+
+fn ks_test_two_sample(Array[Double], Array[Double]) -> Double
+
+fn mutual_information_scores(@math.Matrix, @math.Vector, n_bins? : Int) -> Array[Double]
+
+fn rfe_linear_regression(@math.Matrix, @math.Vector, Int) -> Array[Int]
+
+fn select_by_mutual_information(@math.Matrix, @math.Vector, Int, n_bins? : Int) -> Array[Int]
+
+fn t_test_independent(Array[Double], Array[Double]) -> Double
+
+fn variance_threshold(@math.Matrix, Double) -> Array[Int]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+
