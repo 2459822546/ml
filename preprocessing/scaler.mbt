@@ -9,6 +9,24 @@ pub struct StandardScaler {
 }
 
 ///|
+/// 校验特征矩阵是否为空且各行长度一致
+fn validate_feature_matrix(data : Array[Array[Double]]) -> Int {
+  if data.length() == 0 {
+    abort("数据不能为空")
+  }
+  let n_features = data[0].length()
+  if n_features == 0 {
+    abort("特征数量必须大于 0")
+  }
+  for i = 0; i < data.length(); i = i + 1 {
+    if data[i].length() != n_features {
+      abort("第 \{i} 行的特征数量与其他行不一致")
+    }
+  }
+  n_features
+}
+
+///|
 pub fn StandardScaler::new() -> StandardScaler {
   { mean: [], std: [], fitted: false }
 }
@@ -16,12 +34,12 @@ pub fn StandardScaler::new() -> StandardScaler {
 ///|
 /// 拟合数据，计算均值和标准差
 /// @param data 训练数据，每个元素是一个样本（特征数组）
-pub fn fit(self : StandardScaler, data : Array[Array[Double]]) -> Unit {
-  if data.length() == 0 {
-    abort("数据不能为空")
-  }
+pub fn StandardScaler::fit(
+  self : StandardScaler,
+  data : Array[Array[Double]],
+) -> Unit {
+  let n_features = validate_feature_matrix(data)
   let n_samples = data.length()
-  let n_features = data[0].length()
 
   // 初始化均值和标准差数组
   self.mean = Array::make(n_features, 0.0)
@@ -56,15 +74,18 @@ pub fn fit(self : StandardScaler, data : Array[Array[Double]]) -> Unit {
 /// 转换数据
 /// @param data 待转换的数据
 /// @return 标准化后的数据
-pub fn transform(
+pub fn StandardScaler::transform(
   self : StandardScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
   if not(self.fitted) {
     abort("必须先调用 fit() 方法")
   }
+  let n_features = validate_feature_matrix(data)
+  if n_features != self.mean.length() {
+    abort("特征数量与拟合时不一致")
+  }
   let n_samples = data.length()
-  let n_features = data[0].length()
   let result = Array::make(n_samples, [])
   for i = 0; i < n_samples; i = i + 1 {
     let row = Array::make(n_features, 0.0)
@@ -78,7 +99,7 @@ pub fn transform(
 
 ///|
 /// 拟合并转换数据（一步完成）
-pub fn fit_transform(
+pub fn StandardScaler::fit_transform(
   self : StandardScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -88,15 +109,18 @@ pub fn fit_transform(
 
 ///|
 /// 反转换（还原标准化）
-pub fn inverse_transform(
+pub fn StandardScaler::inverse_transform(
   self : StandardScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
   if not(self.fitted) {
     abort("必须先调用 fit() 方法")
   }
+  let n_features = validate_feature_matrix(data)
+  if n_features != self.mean.length() {
+    abort("特征数量与拟合时不一致")
+  }
   let n_samples = data.length()
-  let n_features = data[0].length()
   let result = Array::make(n_samples, [])
   for i = 0; i < n_samples; i = i + 1 {
     let row = Array::make(n_features, 0.0)
@@ -135,12 +159,12 @@ pub fn MinMaxScaler::new(
 
 ///|
 /// 拟合数据，计算最小值和最大值
-pub fn fit(self : MinMaxScaler, data : Array[Array[Double]]) -> Unit {
-  if data.length() == 0 {
-    abort("数据不能为空")
-  }
+pub fn MinMaxScaler::fit(
+  self : MinMaxScaler,
+  data : Array[Array[Double]],
+) -> Unit {
+  let n_features = validate_feature_matrix(data)
   let n_samples = data.length()
-  let n_features = data[0].length()
   self.data_min = Array::make(n_features, @double.infinity)
   self.data_max = Array::make(n_features, @double.neg_infinity)
 
@@ -165,15 +189,18 @@ pub fn fit(self : MinMaxScaler, data : Array[Array[Double]]) -> Unit {
 
 ///|
 /// 转换数据
-pub fn transform(
+pub fn MinMaxScaler::transform(
   self : MinMaxScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
   if not(self.fitted) {
     abort("必须先调用 fit() 方法")
   }
+  let n_features = validate_feature_matrix(data)
+  if n_features != self.data_min.length() {
+    abort("特征数量与拟合时不一致")
+  }
   let n_samples = data.length()
-  let n_features = data[0].length()
   let result = Array::make(n_samples, [])
   for i = 0; i < n_samples; i = i + 1 {
     let row = Array::make(n_features, 0.0)
@@ -190,7 +217,7 @@ pub fn transform(
 
 ///|
 /// 拟合并转换数据
-pub fn fit_transform(
+pub fn MinMaxScaler::fit_transform(
   self : MinMaxScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -200,15 +227,18 @@ pub fn fit_transform(
 
 ///|
 /// 反转换
-pub fn inverse_transform(
+pub fn MinMaxScaler::inverse_transform(
   self : MinMaxScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
   if not(self.fitted) {
     abort("必须先调用 fit() 方法")
   }
+  let n_features = validate_feature_matrix(data)
+  if n_features != self.data_min.length() {
+    abort("特征数量与拟合时不一致")
+  }
   let n_samples = data.length()
-  let n_features = data[0].length()
   let result = Array::make(n_samples, [])
   for i = 0; i < n_samples; i = i + 1 {
     let row = Array::make(n_features, 0.0)
@@ -244,7 +274,7 @@ pub fn Normalizer::new(norm? : NormType = L2) -> Normalizer {
 
 ///|
 /// 转换数据（归一化不需要拟合）
-pub fn transform(
+pub fn Normalizer::transform(
   self : Normalizer,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -258,7 +288,7 @@ pub fn transform(
 
 ///|
 /// 拟合并转换（归一化不需要拟合，直接转换）
-pub fn fit_transform(
+pub fn Normalizer::fit_transform(
   self : Normalizer,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -267,7 +297,10 @@ pub fn fit_transform(
 
 ///|
 /// 归一化单个样本
-fn normalize_sample(self : Normalizer, sample : Array[Double]) -> Array[Double] {
+fn Normalizer::normalize_sample(
+  self : Normalizer,
+  sample : Array[Double],
+) -> Array[Double] {
   let n_features = sample.length()
   let result = Array::make(n_features, 0.0)
 
@@ -326,7 +359,10 @@ pub fn RobustScaler::new() -> RobustScaler {
 
 ///|
 /// 拟合数据
-pub fn fit(self : RobustScaler, data : Array[Array[Double]]) -> Unit {
+pub fn RobustScaler::fit(
+  self : RobustScaler,
+  data : Array[Array[Double]],
+) -> Unit {
   if data.length() == 0 {
     abort("数据不能为空")
   }
@@ -362,7 +398,7 @@ pub fn fit(self : RobustScaler, data : Array[Array[Double]]) -> Unit {
 
 ///|
 /// 转换数据
-pub fn transform(
+pub fn RobustScaler::transform(
   self : RobustScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
@@ -384,7 +420,7 @@ pub fn transform(
 
 ///|
 /// 拟合并转换数据
-pub fn fit_transform(
+pub fn RobustScaler::fit_transform(
   self : RobustScaler,
   data : Array[Array[Double]],
 ) -> Array[Array[Double]] {
