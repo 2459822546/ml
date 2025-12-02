@@ -1,21 +1,37 @@
 ///| 统计函数模块
-/// 提供常用的统计计算功能
-
-///| 基础统计
+/// 以更轻量的风格提供常用统计计算
 
 ///|
-/// 计算数组的中位数
-pub fn median(data : Array[Double]) -> Double {
+/// 复制并排序数据（不改原数组）
+fn sorted_copy(data : Array[Double]) -> Array[Double] {
   if data.length() == 0 {
-    abort("空数组没有中位数")
+    abort("至少需要一个数据点")
   }
-
-  // 复制并排序
   let sorted = Array::make(data.length(), 0.0)
   for i = 0; i < data.length(); i = i + 1 {
     sorted[i] = data[i]
   }
   sorted.sort_by(fn(a, b) { if a < b { -1 } else if a > b { 1 } else { 0 } })
+  sorted
+}
+
+///|
+/// 简单的均值实现，避免重复代码
+fn mean(data : Array[Double]) -> Double {
+  if data.length() == 0 {
+    abort("空数组无法计算均值")
+  }
+  let mut total = 0.0
+  for i = 0; i < data.length(); i = i + 1 {
+    total = total + data[i]
+  }
+  total / data.length().to_double()
+}
+
+///|
+/// 中位数
+pub fn median(data : Array[Double]) -> Double {
+  let sorted = sorted_copy(data)
   let n = sorted.length()
   if n % 2 == 1 {
     sorted[n / 2]
@@ -25,21 +41,12 @@ pub fn median(data : Array[Double]) -> Double {
 }
 
 ///|
-/// 计算百分位数
+/// 百分位数
 pub fn percentile(data : Array[Double], p : Double) -> Double {
-  if data.length() == 0 {
-    abort("空数组没有百分位数")
-  }
   if p < 0.0 || p > 100.0 {
     abort("百分位数必须在 0-100 之间")
   }
-
-  // 复制并排序
-  let sorted = Array::make(data.length(), 0.0)
-  for i = 0; i < data.length(); i = i + 1 {
-    sorted[i] = data[i]
-  }
-  sorted.sort_by(fn(a, b) { if a < b { -1 } else if a > b { 1 } else { 0 } })
+  let sorted = sorted_copy(data)
   let n = sorted.length()
   let index = p / 100.0 * (n - 1).to_double()
   let lower = index.to_int()
@@ -53,7 +60,7 @@ pub fn percentile(data : Array[Double], p : Double) -> Double {
 }
 
 ///|
-/// 计算四分位距 (IQR)
+/// 四分位距 (IQR)
 pub fn iqr(data : Array[Double]) -> Double {
   let q1 = percentile(data, 25.0)
   let q3 = percentile(data, 75.0)
@@ -61,23 +68,20 @@ pub fn iqr(data : Array[Double]) -> Double {
 }
 
 ///|
-/// 计算偏度 (Skewness)
+/// 偏度 (Skewness)
 pub fn skewness(data : Array[Double]) -> Double {
   if data.length() < 3 {
     abort("计算偏度至少需要 3 个数据点")
   }
   let n = data.length()
-  let mut sum = 0.0
-  for i = 0; i < n; i = i + 1 {
-    sum = sum + data[i]
-  }
-  let mean = sum / n.to_double()
+  let mean_val = mean(data)
   let mut sum_sq = 0.0
   let mut sum_cube = 0.0
   for i = 0; i < n; i = i + 1 {
-    let diff = data[i] - mean
-    sum_sq = sum_sq + diff * diff
-    sum_cube = sum_cube + diff * diff * diff
+    let diff = data[i] - mean_val
+    let diff_sq = diff * diff
+    sum_sq = sum_sq + diff_sq
+    sum_cube = sum_cube + diff_sq * diff
   }
   let variance = sum_sq / n.to_double()
   let std = variance.sqrt()
@@ -88,21 +92,17 @@ pub fn skewness(data : Array[Double]) -> Double {
 }
 
 ///|
-/// 计算峰度 (Kurtosis)
+/// 峰度 (Kurtosis)
 pub fn kurtosis(data : Array[Double]) -> Double {
   if data.length() < 4 {
     abort("计算峰度至少需要 4 个数据点")
   }
   let n = data.length()
-  let mut sum = 0.0
-  for i = 0; i < n; i = i + 1 {
-    sum = sum + data[i]
-  }
-  let mean = sum / n.to_double()
+  let mean_val = mean(data)
   let mut sum_sq = 0.0
   let mut sum_fourth = 0.0
   for i = 0; i < n; i = i + 1 {
-    let diff = data[i] - mean
+    let diff = data[i] - mean_val
     let diff_sq = diff * diff
     sum_sq = sum_sq + diff_sq
     sum_fourth = sum_fourth + diff_sq * diff_sq
