@@ -132,6 +132,43 @@ pub fn MLP::mlp_predict(self : MLP, x : @math.Matrix) -> Array[Int] {
 }
 
 ///|
+pub fn MLP::forward_tensor(self : MLP, x : @math.Tensor) -> @math.Tensor {
+  let mat = tensor_to_matrix(x)
+  let out = self.forward(mat)
+  matrix_to_tensor(out)
+}
+
+///|
+pub fn MLP::mlp_predict_proba_tensor(
+  self : MLP,
+  x : @math.Tensor,
+) -> @math.Tensor {
+  self.forward_tensor(x)
+}
+
+///|
+pub fn MLP::mlp_predict_tensor(self : MLP, x : @math.Tensor) -> Array[Int] {
+  let prob = self.forward_tensor(x)
+  let shape = prob.get_shape()
+  let n = shape[0]
+  let c = shape[1]
+  let labels = Array::make(n, 0)
+  for i = 0; i < n; i = i + 1 {
+    let mut best = 0
+    let mut best_v = prob.get([i, 0])
+    for j = 1; j < c; j = j + 1 {
+      let v = prob.get([i, j])
+      if v > best_v {
+        best_v = v
+        best = j
+      }
+    }
+    labels[i] = best
+  }
+  labels
+}
+
+///|
 /// 简化的参数提取：只用于测试或手动更新
 pub fn MLP::mlp_params(self : MLP) -> Array[OptimParam] {
   let params = Array::make(self.layers.length() * 2, OptimParam::new([]))
