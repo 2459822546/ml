@@ -8,9 +8,15 @@ import(
 // Values
 fn accuracy_score(@math.Vector, @math.Vector) -> Double
 
+fn adjusted_r2_score(@math.Vector, @math.Vector, Int) -> Double
+
 fn chi_square_gof(Array[Double], Array[Double]) -> Double
 
+fn confusion_matrix(@math.Vector, @math.Vector) -> Array[Array[Int]]
+
 fn correlation_filter(@math.Matrix, Double) -> Array[Int]
+
+fn davies_bouldin_score(Array[Array[Double]], Array[Int]) -> Double
 
 fn f1_score(@math.Vector, @math.Vector, eps? : Double) -> Double
 
@@ -18,11 +24,19 @@ fn jarque_bera(Array[Double]) -> Double
 
 fn ks_test_two_sample(Array[Double], Array[Double]) -> Double
 
+fn log_loss(@math.Vector, @math.Vector, eps? : Double) -> Double
+
 fn mae(@math.Vector, @math.Vector) -> Double
+
+fn median_absolute_error(@math.Vector, @math.Vector) -> Double
 
 fn mse(@math.Vector, @math.Vector) -> Double
 
 fn mutual_information_scores(@math.Matrix, @math.Vector, n_bins? : Int) -> Array[Double]
+
+fn per_class_precision_recall(@math.Vector, @math.Vector) -> (Array[Double], Array[Double])
+
+fn pr_auc_score(@math.Vector, @math.Vector) -> Double
 
 fn precision_score(@math.Vector, @math.Vector, eps? : Double) -> Double
 
@@ -34,7 +48,11 @@ fn rfe_linear_regression(@math.Matrix, @math.Vector, Int) -> Array[Int]
 
 fn rmse(@math.Vector, @math.Vector) -> Double
 
+fn roc_auc_score(@math.Vector, @math.Vector) -> Double
+
 fn select_by_mutual_information(@math.Matrix, @math.Vector, Int, n_bins? : Int) -> Array[Int]
+
+fn silhouette_score(Array[Array[Double]], Array[Int]) -> Double
 
 fn t_test_independent(Array[Double], Array[Double]) -> Double
 
