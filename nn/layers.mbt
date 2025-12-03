@@ -91,6 +91,39 @@ pub fn act_softmax() -> Activation {
 }
 
 ///|
+fn tensor_to_matrix(t : @math.Tensor) -> @math.Matrix {
+  let shape = t.get_shape()
+  if shape.length() != 2 {
+    abort("Tensor 需要形状 [batch, features]")
+  }
+  let rows = shape[0]
+  let cols = shape[1]
+  let data = Array::make(rows, [])
+  for i = 0; i < rows; i = i + 1 {
+    let row = Array::make(cols, 0.0)
+    for j = 0; j < cols; j = j + 1 {
+      row[j] = t.get([i, j])
+    }
+    data[i] = row
+  }
+  @math.Matrix::new(data)
+}
+
+///|
+fn matrix_to_tensor(m : @math.Matrix) -> @math.Tensor {
+  let (rows, cols) = m.shape()
+  let data = Array::make(rows * cols, 0.0)
+  let mut idx = 0
+  for i = 0; i < rows; i = i + 1 {
+    for j = 0; j < cols; j = j + 1 {
+      data[idx] = m.get(i, j)
+      idx = idx + 1
+    }
+  }
+  @math.Tensor::new(data, [rows, cols])
+}
+
+///|
 fn apply_activation_scalar(x : Double, act : Activation) -> Double {
   match act {
     Relu => if x > 0.0 { x } else { 0.0 }
@@ -139,6 +172,23 @@ pub fn activation_forward(x : @math.Matrix, act : Activation) -> @math.Matrix {
       out
     }
   }
+}
+
+///|
+pub fn Linear::forward_tensor(self : Linear, x : @math.Tensor) -> @math.Tensor {
+  let mat = tensor_to_matrix(x)
+  let out = self.forward(mat)
+  matrix_to_tensor(out)
+}
+
+///|
+pub fn activation_forward_tensor(
+  x : @math.Tensor,
+  act : Activation,
+) -> @math.Tensor {
+  let mat = tensor_to_matrix(x)
+  let out = activation_forward(mat, act)
+  matrix_to_tensor(out)
 }
 
 ///|
