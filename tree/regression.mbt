@@ -398,3 +398,380 @@ pub fn RandomForestRegressor::feature_importances(
   }
   @math.Vector::new(importances)
 }
+
+///|
+fn normalize_weights_reg(weights : Array[Double]) -> Unit {
+  let mut total = 0.0
+  for i = 0; i < weights.length(); i = i + 1 {
+    total = total + weights[i]
+  }
+  if total == 0.0 {
+    return
+  }
+  for i = 0; i < weights.length(); i = i + 1 {
+    weights[i] = weights[i] / total
+  }
+}
+
+///|
+/// ExtraTrees 回归
+pub struct ExtraTreesRegressor {
+  n_estimators : Int
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+  max_features : Int
+  seed : Int
+  mut trees : Array[DecisionTreeRegressor]
+  mut feature_subsets : Array[Array[Int]]
+  mut n_features : Int
+  mut is_fitted : Bool
+}
+
+///|
+pub fn ExtraTreesRegressor::new(
+  n_estimators? : Int = 20,
+  max_depth? : Int = 5,
+  min_samples_split? : Int = 2,
+  min_samples_leaf? : Int = 1,
+  max_features? : Int = 0,
+  seed? : Int = 13,
+) -> ExtraTreesRegressor {
+  if n_estimators <= 0 {
+    abort("n_estimators 必须大于 0")
+  }
+  if max_depth <= 0 {
+    abort("max_depth 必须大于 0")
+  }
+  {
+    n_estimators,
+    max_depth,
+    min_samples_split,
+    min_samples_leaf,
+    max_features,
+    seed,
+    trees: [],
+    feature_subsets: [],
+    n_features: 0,
+    is_fitted: false,
+  }
+}
+
+///|
+pub fn ExtraTreesRegressor::fit(
+  self : ExtraTreesRegressor,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
+  let (n_samples, n_features) = x.shape()
+  if y.size() != n_samples {
+    abort("X 和 y 的样本数不匹配")
+  }
+  self.n_features = n_features
+  self.trees = Array::make(self.n_estimators, DecisionTreeRegressor::new())
+  self.feature_subsets = Array::make(self.n_estimators, [])
+  let mut seed = self.seed
+  for t = 0; t < self.n_estimators; t = t + 1 {
+    seed = lcg_next(seed)
+    let cols = select_feature_subset(n_features, self.max_features, seed)
+    self.feature_subsets[t] = cols
+    let sub_x = slice_matrix_cols(x, cols)
+    let tree = DecisionTreeRegressor::new(
+      max_depth=self.max_depth,
+      min_samples_split=self.min_samples_split,
+      min_samples_leaf=self.min_samples_leaf,
+      random_splits=true,
+      seed~,
+    )
+    tree.fit(sub_x, y)
+    self.trees[t] = tree
+  }
+  self.is_fitted = true
+}
+
+///|
+pub fn ExtraTreesRegressor::predict(
+  self : ExtraTreesRegressor,
+  x : @math.Matrix,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let (n_samples, _) = x.shape()
+  let out = Array::make(n_samples, 0.0)
+  for i = 0; i < n_samples; i = i + 1 {
+    let mut sum = 0.0
+    for t = 0; t < self.trees.length(); t = t + 1 {
+      let cols = self.feature_subsets[t]
+      let sub_x = slice_matrix_cols(x, cols)
+      sum = sum + self.trees[t].predict(sub_x).get(i)
+    }
+    out[i] = sum / self.trees.length().to_double()
+  }
+  @math.Vector::new(out)
+}
+
+///|
+pub fn ExtraTreesRegressor::feature_importances(
+  self : ExtraTreesRegressor,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let importances = Array::make(self.n_features, 0.0)
+  for t = 0; t < self.trees.length(); t = t + 1 {
+    let cols = self.feature_subsets[t]
+    let tree_imp = self.trees[t].feature_importances
+    for j = 0; j < cols.length(); j = j + 1 {
+      importances[cols[j]] = importances[cols[j]] + tree_imp[j]
+    }
+  }
+  for j = 0; j < importances.length(); j = j + 1 {
+    importances[j] = importances[j] / self.trees.length().to_double()
+  }
+  @math.Vector::new(importances)
+}
+
+///|
+/// AdaBoost 回归（简化版 AdaBoost.R2）
+pub struct AdaBoostRegressor {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  seed : Int
+  mut estimators : Array[DecisionTreeRegressor]
+  mut estimator_weights : Array[Double]
+  mut base_value : Double
+  mut is_fitted : Bool
+}
+
+///|
+pub fn AdaBoostRegressor::new(
+  n_estimators? : Int = 30,
+  learning_rate? : Double = 0.8,
+  max_depth? : Int = 3,
+  seed? : Int = 17,
+) -> AdaBoostRegressor {
+  if n_estimators <= 0 {
+    abort("n_estimators 必须大于 0")
+  }
+  if learning_rate <= 0.0 {
+    abort("learning_rate 必须大于 0")
+  }
+  {
+    n_estimators,
+    learning_rate,
+    max_depth,
+    seed,
+    estimators: [],
+    estimator_weights: [],
+    base_value: 0.0,
+    is_fitted: false,
+  }
+}
+
+///|
+pub fn AdaBoostRegressor::fit(
+  self : AdaBoostRegressor,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
+  let (n_samples, n_features) = x.shape()
+  if y.size() != n_samples {
+    abort("X 和 y 的样本数不匹配")
+  }
+  let weights = Array::make(n_samples, 1.0 / n_samples.to_double())
+  self.estimators = Array::make(self.n_estimators, DecisionTreeRegressor::new())
+  self.estimator_weights = Array::make(self.n_estimators, 0.0)
+  self.base_value = y.mean()
+  let mut seed = self.seed
+  let eps = 1.0e-12
+  for m = 0; m < self.n_estimators; m = m + 1 {
+    let indices = Array::make(n_samples, 0)
+    let cumsum = Array::make(n_samples, 0.0)
+    let mut acc = 0.0
+    for i = 0; i < n_samples; i = i + 1 {
+      acc = acc + weights[i]
+      cumsum[i] = acc
+    }
+    seed = lcg_next(seed)
+    for i = 0; i < n_samples; i = i + 1 {
+      seed = lcg_next(seed)
+      let r = seed.to_double() / (0x7fffffff).to_double()
+      let mut chosen = n_samples - 1
+      for j = 0; j < n_samples; j = j + 1 {
+        if r <= cumsum[j] {
+          chosen = j
+          break
+        }
+      }
+      indices[i] = chosen
+    }
+    let boot_x = @math.Matrix::zeros(n_samples, n_features)
+    let boot_y = Array::make(n_samples, 0.0)
+    for i = 0; i < n_samples; i = i + 1 {
+      let idx = indices[i]
+      let row = x.get_row(idx)
+      for f = 0; f < row.size(); f = f + 1 {
+        boot_x.set(i, f, row.get(f))
+      }
+      boot_y[i] = y.get(idx)
+    }
+    let tree = DecisionTreeRegressor::new(
+      max_depth=self.max_depth,
+      random_splits=true,
+      seed~,
+    )
+    tree.fit(boot_x, @math.Vector::new(boot_y))
+    let pred = tree.predict(x)
+    let mut max_err = 0.0
+    let errors = Array::make(n_samples, 0.0)
+    for i = 0; i < n_samples; i = i + 1 {
+      let err = (y.get(i) - pred.get(i)).abs()
+      errors[i] = err
+      if err > max_err {
+        max_err = err
+      }
+    }
+    if max_err == 0.0 {
+      self.estimators[m] = tree
+      self.estimator_weights[m] = 1.0
+      break
+    }
+    let mut weighted_err = 0.0
+    for i = 0; i < n_samples; i = i + 1 {
+      errors[i] = errors[i] / max_err
+      weighted_err = weighted_err + weights[i] * errors[i]
+    }
+    if weighted_err >= 0.5 {
+      continue
+    }
+    let beta = weighted_err / (1.0 - weighted_err + eps)
+    let alpha = self.learning_rate *
+      @moonbitlang/core/math.ln(1.0 / (beta + eps))
+    self.estimators[m] = tree
+    self.estimator_weights[m] = alpha
+    let ln_beta = @moonbitlang/core/math.ln(beta)
+    for i = 0; i < n_samples; i = i + 1 {
+      let exponent = (1.0 - errors[i]) * ln_beta
+      weights[i] = weights[i] * @moonbitlang/core/math.exp(exponent)
+    }
+    normalize_weights_reg(weights)
+  }
+  self.is_fitted = true
+}
+
+///|
+pub fn AdaBoostRegressor::predict(
+  self : AdaBoostRegressor,
+  x : @math.Matrix,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let (n_samples, _) = x.shape()
+  let mut total_alpha = 0.0
+  for i = 0; i < self.estimator_weights.length(); i = i + 1 {
+    total_alpha = total_alpha + self.estimator_weights[i]
+  }
+  let out = Array::make(n_samples, self.base_value)
+  if total_alpha == 0.0 {
+    return @math.Vector::new(out)
+  }
+  for m = 0; m < self.estimators.length(); m = m + 1 {
+    let alpha = self.estimator_weights[m]
+    if alpha == 0.0 || not(self.estimators[m].is_fitted) {
+      continue
+    }
+    let pred = self.estimators[m].predict(x)
+    for i = 0; i < n_samples; i = i + 1 {
+      out[i] = out[i] + alpha * pred.get(i)
+    }
+  }
+  let denom = 1.0 + total_alpha
+  for i = 0; i < n_samples; i = i + 1 {
+    out[i] = out[i] / denom
+  }
+  @math.Vector::new(out)
+}
+
+///|
+/// 梯度提升回归（平方误差）
+pub struct GradientBoostingRegressor {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  mut trees : Array[DecisionTreeRegressor]
+  mut init_value : Double
+  mut is_fitted : Bool
+}
+
+///|
+pub fn GradientBoostingRegressor::new(
+  n_estimators? : Int = 80,
+  learning_rate? : Double = 0.1,
+  max_depth? : Int = 3,
+) -> GradientBoostingRegressor {
+  if n_estimators <= 0 {
+    abort("n_estimators 必须大于 0")
+  }
+  if learning_rate <= 0.0 {
+    abort("learning_rate 必须大于 0")
+  }
+  {
+    n_estimators,
+    learning_rate,
+    max_depth,
+    trees: [],
+    init_value: 0.0,
+    is_fitted: false,
+  }
+}
+
+///|
+pub fn GradientBoostingRegressor::fit(
+  self : GradientBoostingRegressor,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
+  let (n_samples, _) = x.shape()
+  if y.size() != n_samples {
+    abort("X 和 y 的样本数不匹配")
+  }
+  self.init_value = y.mean()
+  let current = Array::make(n_samples, self.init_value)
+  self.trees = Array::make(self.n_estimators, DecisionTreeRegressor::new())
+  for m = 0; m < self.n_estimators; m = m + 1 {
+    let residuals = Array::make(n_samples, 0.0)
+    for i = 0; i < n_samples; i = i + 1 {
+      residuals[i] = y.get(i) - current[i]
+    }
+    let tree = DecisionTreeRegressor::new(max_depth=self.max_depth)
+    tree.fit(x, @math.Vector::new(residuals))
+    let update = tree.predict(x)
+    for i = 0; i < n_samples; i = i + 1 {
+      current[i] = current[i] + self.learning_rate * update.get(i)
+    }
+    self.trees[m] = tree
+  }
+  self.is_fitted = true
+}
+
+///|
+pub fn GradientBoostingRegressor::predict(
+  self : GradientBoostingRegressor,
+  x : @math.Matrix,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let (n_samples, _) = x.shape()
+  let out = Array::make(n_samples, self.init_value)
+  for m = 0; m < self.trees.length(); m = m + 1 {
+    let update = self.trees[m].predict(x)
+    for i = 0; i < n_samples; i = i + 1 {
+      out[i] = out[i] + self.learning_rate * update.get(i)
+    }
+  }
+  @math.Vector::new(out)
+}

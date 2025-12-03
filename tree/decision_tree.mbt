@@ -585,3 +585,438 @@ pub fn RandomForestClassifier::feature_importances(
   }
   @math.Vector::new(importances)
 }
+
+///|
+fn assert_binary_labels_tree(y : @math.Vector) -> Unit {
+  for i = 0; i < y.size(); i = i + 1 {
+    let v = y.get(i)
+    if not(v == 0.0 || v == 1.0) {
+      abort("仅支持 {0,1} 标签")
+    }
+  }
+}
+
+///|
+fn to_pm1(v : Double) -> Double {
+  if v == 0.0 {
+    -1.0
+  } else if v == 1.0 {
+    1.0
+  } else {
+    abort("标签必须是 0 或 1")
+  }
+}
+
+///|
+fn normalize_weights(weights : Array[Double]) -> Unit {
+  let mut total = 0.0
+  for i = 0; i < weights.length(); i = i + 1 {
+    total = total + weights[i]
+  }
+  if total == 0.0 {
+    return
+  }
+  for i = 0; i < weights.length(); i = i + 1 {
+    weights[i] = weights[i] / total
+  }
+}
+
+///|
+fn sigmoid_tree(z : Double) -> Double {
+  1.0 / (1.0 + @moonbitlang/core/math.exp(-z))
+}
+
+///|
+/// ExtraTrees 分类器（极端随机树）
+pub struct ExtraTreesClassifier {
+  n_estimators : Int
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+  max_features : Int
+  seed : Int
+  mut trees : Array[DecisionTreeClassifier]
+  mut feature_subsets : Array[Array[Int]]
+  mut classes : Array[Double]
+  mut n_features : Int
+  mut is_fitted : Bool
+}
+
+///|
+pub fn ExtraTreesClassifier::new(
+  n_estimators? : Int = 10,
+  max_depth? : Int = 5,
+  min_samples_split? : Int = 2,
+  min_samples_leaf? : Int = 1,
+  max_features? : Int = 0,
+  seed? : Int = 7,
+) -> ExtraTreesClassifier {
+  if n_estimators <= 0 {
+    abort("n_estimators 必须大于 0")
+  }
+  if max_depth <= 0 {
+    abort("max_depth 必须大于 0")
+  }
+  {
+    n_estimators,
+    max_depth,
+    min_samples_split,
+    min_samples_leaf,
+    max_features,
+    seed,
+    trees: [],
+    feature_subsets: [],
+    classes: [],
+    n_features: 0,
+    is_fitted: false,
+  }
+}
+
+///|
+pub fn ExtraTreesClassifier::fit(
+  self : ExtraTreesClassifier,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
+  let (n_samples, n_features) = x.shape()
+  if y.size() != n_samples {
+    abort("X 和 y 的样本数不匹配")
+  }
+  self.classes = unique_labels(y)
+  self.n_features = n_features
+  self.trees = Array::make(self.n_estimators, DecisionTreeClassifier::new())
+  self.feature_subsets = Array::make(self.n_estimators, [])
+  let mut seed = self.seed
+  for t = 0; t < self.n_estimators; t = t + 1 {
+    seed = lcg_next(seed)
+    let cols = select_feature_subset(n_features, self.max_features, seed)
+    self.feature_subsets[t] = cols
+    let sub_x = slice_matrix_cols(x, cols)
+    let tree = DecisionTreeClassifier::new(
+      max_depth=self.max_depth,
+      min_samples_split=self.min_samples_split,
+      min_samples_leaf=self.min_samples_leaf,
+      random_splits=true,
+      seed~,
+    )
+    tree.fit(sub_x, y)
+    self.trees[t] = tree
+  }
+  self.is_fitted = true
+}
+
+///|
+pub fn ExtraTreesClassifier::predict(
+  self : ExtraTreesClassifier,
+  x : @math.Matrix,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let (n_samples, _) = x.shape()
+  let votes = Array::make(n_samples, Array::make(self.classes.length(), 0))
+  for t = 0; t < self.trees.length(); t = t + 1 {
+    let cols = self.feature_subsets[t]
+    let sub_x = slice_matrix_cols(x, cols)
+    let pred = self.trees[t].predict(sub_x)
+    for i = 0; i < n_samples; i = i + 1 {
+      let cls_idx = label_index(pred.get(i), self.classes)
+      votes[i][cls_idx] = votes[i][cls_idx] + 1
+    }
+  }
+  let out = Array::make(n_samples, 0.0)
+  for i = 0; i < n_samples; i = i + 1 {
+    let mut best = 0
+    let mut best_count = -1
+    for c = 0; c < self.classes.length(); c = c + 1 {
+      if votes[i][c] > best_count {
+        best_count = votes[i][c]
+        best = c
+      }
+    }
+    out[i] = self.classes[best]
+  }
+  @math.Vector::new(out)
+}
+
+///|
+pub fn ExtraTreesClassifier::feature_importances(
+  self : ExtraTreesClassifier,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let importances = Array::make(self.n_features, 0.0)
+  for t = 0; t < self.trees.length(); t = t + 1 {
+    let cols = self.feature_subsets[t]
+    let tree_imp = self.trees[t].feature_importances
+    for j = 0; j < cols.length(); j = j + 1 {
+      importances[cols[j]] = importances[cols[j]] + tree_imp[j]
+    }
+  }
+  for j = 0; j < importances.length(); j = j + 1 {
+    importances[j] = importances[j] / self.trees.length().to_double()
+  }
+  @math.Vector::new(importances)
+}
+
+///|
+/// AdaBoost 二分类（使用决策树桩）
+pub struct AdaBoostClassifier {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  seed : Int
+  mut estimators : Array[DecisionTreeClassifier]
+  mut estimator_weights : Array[Double]
+  mut classes : Array[Double]
+  mut is_fitted : Bool
+}
+
+///|
+pub fn AdaBoostClassifier::new(
+  n_estimators? : Int = 20,
+  learning_rate? : Double = 1.0,
+  max_depth? : Int = 1,
+  seed? : Int = 11,
+) -> AdaBoostClassifier {
+  if n_estimators <= 0 {
+    abort("n_estimators 必须大于 0")
+  }
+  if learning_rate <= 0.0 {
+    abort("learning_rate 必须大于 0")
+  }
+  {
+    n_estimators,
+    learning_rate,
+    max_depth,
+    seed,
+    estimators: [],
+    estimator_weights: [],
+    classes: [],
+    is_fitted: false,
+  }
+}
+
+///|
+pub fn AdaBoostClassifier::fit(
+  self : AdaBoostClassifier,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
+  let (n_samples, n_features) = x.shape()
+  if y.size() != n_samples {
+    abort("X 和 y 的样本数不匹配")
+  }
+  assert_binary_labels_tree(y)
+  self.classes = unique_labels(y)
+  let weights = Array::make(n_samples, 1.0 / n_samples.to_double())
+  self.estimators = Array::make(
+    self.n_estimators,
+    DecisionTreeClassifier::new(),
+  )
+  self.estimator_weights = Array::make(self.n_estimators, 0.0)
+  let mut seed = self.seed
+  for m = 0; m < self.n_estimators; m = m + 1 {
+    // 按权重有放回抽样
+    let indices = Array::make(n_samples, 0)
+    let cumsum = Array::make(n_samples, 0.0)
+    let mut acc = 0.0
+    for i = 0; i < n_samples; i = i + 1 {
+      acc = acc + weights[i]
+      cumsum[i] = acc
+    }
+    seed = lcg_next(seed)
+    for i = 0; i < n_samples; i = i + 1 {
+      seed = lcg_next(seed)
+      let r = seed.to_double() / (0x7fffffff).to_double() // 伪随机 0-1
+      let mut chosen = n_samples - 1
+      for j = 0; j < n_samples; j = j + 1 {
+        if r <= cumsum[j] {
+          chosen = j
+          break
+        }
+      }
+      indices[i] = chosen
+    }
+    let boot_x = @math.Matrix::zeros(n_samples, n_features)
+    let boot_y = Array::make(n_samples, 0.0)
+    for i = 0; i < n_samples; i = i + 1 {
+      let idx = indices[i]
+      let row = x.get_row(idx)
+      for f = 0; f < row.size(); f = f + 1 {
+        boot_x.set(i, f, row.get(f))
+      }
+      boot_y[i] = y.get(idx)
+    }
+    let tree = DecisionTreeClassifier::new(
+      max_depth=self.max_depth,
+      min_samples_split=2,
+      min_samples_leaf=1,
+      seed~,
+    )
+    tree.fit(boot_x, @math.Vector::new(boot_y))
+    let pred = tree.predict(x)
+    let mut err = 0.0
+    for i = 0; i < n_samples; i = i + 1 {
+      let yi = to_pm1(y.get(i))
+      let pi = to_pm1(pred.get(i))
+      if yi != pi {
+        err = err + weights[i]
+      }
+    }
+    if err >= 0.5 {
+      continue
+    }
+    let eps = 1.0e-12
+    let alpha = 0.5 *
+      @moonbitlang/core/math.ln((1.0 - err + eps) / (err + eps)) *
+      self.learning_rate
+    self.estimators[m] = tree
+    self.estimator_weights[m] = alpha
+    for i = 0; i < n_samples; i = i + 1 {
+      let yi = to_pm1(y.get(i))
+      let pi = to_pm1(pred.get(i))
+      weights[i] = weights[i] * @moonbitlang/core/math.exp(-alpha * yi * pi)
+    }
+    normalize_weights(weights)
+  }
+  self.is_fitted = true
+}
+
+///|
+pub fn AdaBoostClassifier::predict(
+  self : AdaBoostClassifier,
+  x : @math.Matrix,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let (n_samples, _) = x.shape()
+  let scores = Array::make(n_samples, 0.0)
+  for m = 0; m < self.estimators.length(); m = m + 1 {
+    let alpha = self.estimator_weights[m]
+    if alpha == 0.0 || not(self.estimators[m].is_fitted) {
+      continue
+    }
+    let pred = self.estimators[m].predict(x)
+    for i = 0; i < n_samples; i = i + 1 {
+      scores[i] = scores[i] + alpha * to_pm1(pred.get(i))
+    }
+  }
+  let out = Array::make(n_samples, 0.0)
+  for i = 0; i < n_samples; i = i + 1 {
+    out[i] = if scores[i] >= 0.0 { 1.0 } else { 0.0 }
+  }
+  @math.Vector::new(out)
+}
+
+///|
+/// 梯度提升二分类（对数损失）
+pub struct GradientBoostingClassifier {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  mut trees : Array[DecisionTreeRegressor]
+  mut init_log_odds : Double
+  mut is_fitted : Bool
+}
+
+///|
+pub fn GradientBoostingClassifier::new(
+  n_estimators? : Int = 50,
+  learning_rate? : Double = 0.1,
+  max_depth? : Int = 2,
+) -> GradientBoostingClassifier {
+  if n_estimators <= 0 {
+    abort("n_estimators 必须大于 0")
+  }
+  if learning_rate <= 0.0 {
+    abort("learning_rate 必须大于 0")
+  }
+  {
+    n_estimators,
+    learning_rate,
+    max_depth,
+    trees: [],
+    init_log_odds: 0.0,
+    is_fitted: false,
+  }
+}
+
+///|
+pub fn GradientBoostingClassifier::fit(
+  self : GradientBoostingClassifier,
+  x : @math.Matrix,
+  y : @math.Vector,
+) -> Unit {
+  let (n_samples, _) = x.shape()
+  if y.size() != n_samples {
+    abort("X 和 y 的样本数不匹配")
+  }
+  assert_binary_labels_tree(y)
+  let mut pos = 0.0
+  for i = 0; i < y.size(); i = i + 1 {
+    pos = pos + y.get(i)
+  }
+  let mut p = pos / n_samples.to_double()
+  if p < 1.0e-6 {
+    p = 1.0e-6
+  }
+  if p > 1.0 - 1.0e-6 {
+    p = 1.0 - 1.0e-6
+  }
+  self.init_log_odds = @moonbitlang/core/math.ln(p / (1.0 - p))
+  let scores = Array::make(n_samples, self.init_log_odds)
+  self.trees = Array::make(self.n_estimators, DecisionTreeRegressor::new())
+  for m = 0; m < self.n_estimators; m = m + 1 {
+    let residuals = Array::make(n_samples, 0.0)
+    for i = 0; i < n_samples; i = i + 1 {
+      let prob = sigmoid_tree(scores[i])
+      residuals[i] = y.get(i) - prob
+    }
+    let tree = DecisionTreeRegressor::new(max_depth=self.max_depth)
+    tree.fit(x, @math.Vector::new(residuals))
+    let update = tree.predict(x)
+    for i = 0; i < n_samples; i = i + 1 {
+      scores[i] = scores[i] + self.learning_rate * update.get(i)
+    }
+    self.trees[m] = tree
+  }
+  self.is_fitted = true
+}
+
+///|
+pub fn GradientBoostingClassifier::predict_proba(
+  self : GradientBoostingClassifier,
+  x : @math.Matrix,
+) -> @math.Vector {
+  if not(self.is_fitted) {
+    abort("模型尚未训练")
+  }
+  let (n_samples, _) = x.shape()
+  let scores = Array::make(n_samples, self.init_log_odds)
+  for m = 0; m < self.trees.length(); m = m + 1 {
+    let update = self.trees[m].predict(x)
+    for i = 0; i < n_samples; i = i + 1 {
+      scores[i] = scores[i] + self.learning_rate * update.get(i)
+    }
+  }
+  for i = 0; i < n_samples; i = i + 1 {
+    scores[i] = sigmoid_tree(scores[i])
+  }
+  @math.Vector::new(scores)
+}
+
+///|
+pub fn GradientBoostingClassifier::predict(
+  self : GradientBoostingClassifier,
+  x : @math.Matrix,
+) -> @math.Vector {
+  let prob = self.predict_proba(x)
+  let out = Array::make(prob.size(), 0.0)
+  for i = 0; i < prob.size(); i = i + 1 {
+    out[i] = if prob.get(i) >= 0.5 { 1.0 } else { 0.0 }
+  }
+  @math.Vector::new(out)
+}

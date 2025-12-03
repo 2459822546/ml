@@ -10,10 +10,39 @@ import(
 // Errors
 
 // Types and methods
+pub struct AdaBoostClassifier {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  seed : Int
+  mut estimators : Array[DecisionTreeClassifier]
+  mut estimator_weights : Array[Double]
+  mut classes : Array[Double]
+  mut is_fitted : Bool
+}
+fn AdaBoostClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn AdaBoostClassifier::new(n_estimators? : Int, learning_rate? : Double, max_depth? : Int, seed? : Int) -> Self
+fn AdaBoostClassifier::predict(Self, @math.Matrix) -> @math.Vector
+
+pub struct AdaBoostRegressor {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  seed : Int
+  mut estimators : Array[DecisionTreeRegressor]
+  mut estimator_weights : Array[Double]
+  mut base_value : Double
+  mut is_fitted : Bool
+}
+fn AdaBoostRegressor::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn AdaBoostRegressor::new(n_estimators? : Int, learning_rate? : Double, max_depth? : Int, seed? : Int) -> Self
+fn AdaBoostRegressor::predict(Self, @math.Matrix) -> @math.Vector
+
 pub struct DecisionTreeClassifier {
   max_depth : Int
   min_samples_split : Int
   min_samples_leaf : Int
+  random_splits : Bool
   mut features : Array[Int]
   mut thresholds : Array[Double]
   mut left : Array[Int]
@@ -40,15 +69,77 @@ pub struct DecisionTreeRegressor {
   mut predictions : Array[Double]
   mut is_leaf : Array[Bool]
   mut feature_importances : Array[Double]
+  mut split_seed : Int
   mut n_features : Int
   mut is_fitted : Bool
   max_depth : Int
   min_samples_split : Int
   min_samples_leaf : Int
+  random_splits : Bool
 }
 fn DecisionTreeRegressor::fit(Self, @math.Matrix, @math.Vector) -> Unit
-fn DecisionTreeRegressor::new(max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int) -> Self
+fn DecisionTreeRegressor::new(max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int, random_splits? : Bool, seed? : Int) -> Self
 fn DecisionTreeRegressor::predict(Self, @math.Matrix) -> @math.Vector
+
+pub struct ExtraTreesClassifier {
+  n_estimators : Int
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+  max_features : Int
+  seed : Int
+  mut trees : Array[DecisionTreeClassifier]
+  mut feature_subsets : Array[Array[Int]]
+  mut classes : Array[Double]
+  mut n_features : Int
+  mut is_fitted : Bool
+}
+fn ExtraTreesClassifier::feature_importances(Self) -> @math.Vector
+fn ExtraTreesClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn ExtraTreesClassifier::new(n_estimators? : Int, max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int, max_features? : Int, seed? : Int) -> Self
+fn ExtraTreesClassifier::predict(Self, @math.Matrix) -> @math.Vector
+
+pub struct ExtraTreesRegressor {
+  n_estimators : Int
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+  max_features : Int
+  seed : Int
+  mut trees : Array[DecisionTreeRegressor]
+  mut feature_subsets : Array[Array[Int]]
+  mut n_features : Int
+  mut is_fitted : Bool
+}
+fn ExtraTreesRegressor::feature_importances(Self) -> @math.Vector
+fn ExtraTreesRegressor::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn ExtraTreesRegressor::new(n_estimators? : Int, max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int, max_features? : Int, seed? : Int) -> Self
+fn ExtraTreesRegressor::predict(Self, @math.Matrix) -> @math.Vector
+
+pub struct GradientBoostingClassifier {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  mut trees : Array[DecisionTreeRegressor]
+  mut init_log_odds : Double
+  mut is_fitted : Bool
+}
+fn GradientBoostingClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn GradientBoostingClassifier::new(n_estimators? : Int, learning_rate? : Double, max_depth? : Int) -> Self
+fn GradientBoostingClassifier::predict(Self, @math.Matrix) -> @math.Vector
+fn GradientBoostingClassifier::predict_proba(Self, @math.Matrix) -> @math.Vector
+
+pub struct GradientBoostingRegressor {
+  n_estimators : Int
+  learning_rate : Double
+  max_depth : Int
+  mut trees : Array[DecisionTreeRegressor]
+  mut init_value : Double
+  mut is_fitted : Bool
+}
+fn GradientBoostingRegressor::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn GradientBoostingRegressor::new(n_estimators? : Int, learning_rate? : Double, max_depth? : Int) -> Self
+fn GradientBoostingRegressor::predict(Self, @math.Matrix) -> @math.Vector
 
 pub struct RandomForestClassifier {
   n_estimators : Int
