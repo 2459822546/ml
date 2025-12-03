@@ -1,0 +1,36 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/neighbors"
+
+import(
+  "2459822546/ml/math"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct KNeighborsClassifier {
+  k : Int
+  mut train_x : @math.Matrix
+  mut train_y : @math.Vector
+  mut is_fitted : Bool
+}
+fn KNeighborsClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn KNeighborsClassifier::new(k? : Int) -> Self
+fn KNeighborsClassifier::predict(Self, @math.Matrix) -> @math.Vector
+
+pub struct KNeighborsRegressor {
+  k : Int
+  mut train_x : @math.Matrix
+  mut train_y : @math.Vector
+  mut is_fitted : Bool
+}
+fn KNeighborsRegressor::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn KNeighborsRegressor::new(k? : Int) -> Self
+fn KNeighborsRegressor::predict(Self, @math.Matrix) -> @math.Vector
+
+// Type aliases
+
+// Traits
+
