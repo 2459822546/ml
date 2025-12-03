@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/mixture"
+
+import(
+  "2459822546/ml/math"
+)
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct GaussianMixture {
+  n_components : Int
+  max_iter : Int
+  tol : Double
+  mut weights : Array[Double]
+  mut means : Array[@math.Vector]
+  mut covariances : Array[@math.Vector]
+  mut is_fitted : Bool
+}
+fn GaussianMixture::fit(Self, @math.Matrix) -> Unit
+fn GaussianMixture::new(Int, max_iter? : Int, tol? : Double) -> Self
+fn GaussianMixture::predict(Self, @math.Matrix) -> Array[Int]
+fn GaussianMixture::predict_proba(Self, @math.Matrix) -> @math.Matrix
+
+// Type aliases
+
+// Traits
+
