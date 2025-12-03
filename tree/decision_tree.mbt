@@ -7,6 +7,7 @@ pub struct DecisionTreeClassifier {
   max_depth : Int
   min_samples_split : Int
   min_samples_leaf : Int
+  random_splits : Bool
   mut features : Array[Int]
   mut thresholds : Array[Double]
   mut left : Array[Int]
@@ -14,6 +15,7 @@ pub struct DecisionTreeClassifier {
   mut predictions : Array[Double]
   mut is_leaf : Array[Bool]
   mut feature_importances : Array[Double]
+  mut split_seed : Int
   mut n_features : Int
   mut classes : Array[Double]
   mut is_fitted : Bool
@@ -24,6 +26,8 @@ pub fn DecisionTreeClassifier::new(
   max_depth? : Int = 5,
   min_samples_split? : Int = 2,
   min_samples_leaf? : Int = 1,
+  random_splits? : Bool = false,
+  seed? : Int = 42,
 ) -> DecisionTreeClassifier {
   if max_depth <= 0 {
     abort("max_depth 必须大于 0")
@@ -38,6 +42,7 @@ pub fn DecisionTreeClassifier::new(
     max_depth,
     min_samples_split,
     min_samples_leaf,
+    random_splits,
     features: [],
     thresholds: [],
     left: [],
@@ -45,6 +50,7 @@ pub fn DecisionTreeClassifier::new(
     predictions: [],
     is_leaf: [],
     feature_importances: [],
+    split_seed: seed,
     n_features: 0,
     classes: [],
     is_fitted: false,
@@ -134,6 +140,7 @@ fn DecisionTreeClassifier::evaluate_best_split(
 ) -> (Bool, Int, Double, Array[Int], Array[Int], Double) {
   let n_samples = samples.length()
   let n_features = self.n_features
+  let use_random = self.random_splits
   let n_classes = self.classes.length()
   let mut best_feature = -1
   let mut best_threshold = 0.0
@@ -163,13 +170,23 @@ fn DecisionTreeClassifier::evaluate_best_split(
       let cls = label_index(y.get(idx[i]), self.classes)
       right_counts[cls] = right_counts[cls] + 1
     }
+    let marks = Array::make(n_samples, false)
+    if use_random && n_samples > 1 {
+      let limit = if n_samples - 1 < 8 { n_samples - 1 } else { 8 }
+      for c = 0; c < limit; c = c + 1 {
+        self.split_seed = lcg_next(self.split_seed)
+        let pos = self.split_seed % (n_samples - 1)
+        marks[pos] = true
+      }
+    }
     for i = 0; i < n_samples - 1; i = i + 1 {
       let cls = label_index(y.get(idx[i]), self.classes)
       left_counts[cls] = left_counts[cls] + 1
       right_counts[cls] = right_counts[cls] - 1
       let v = x.get(idx[i], feature)
       let v_next = x.get(idx[i + 1], feature)
-      if v == v_next {
+      let should_check = if use_random { marks[i] } else { true }
+      if v == v_next || not(should_check) {
         continue
       }
       let left_size = i + 1

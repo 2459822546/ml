@@ -21,13 +21,14 @@ pub struct DecisionTreeClassifier {
   mut predictions : Array[Double]
   mut is_leaf : Array[Bool]
   mut feature_importances : Array[Double]
+  mut split_seed : Int
   mut n_features : Int
   mut classes : Array[Double]
   mut is_fitted : Bool
 }
 fn DecisionTreeClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
 fn DecisionTreeClassifier::get_feature_importances(Self) -> @math.Vector
-fn DecisionTreeClassifier::new(max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int) -> Self
+fn DecisionTreeClassifier::new(max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int, random_splits? : Bool, seed? : Int) -> Self
 fn DecisionTreeClassifier::predict(Self, @math.Matrix) -> @math.Vector
 fn DecisionTreeClassifier::score(Self, @math.Matrix, @math.Vector) -> Double
 
