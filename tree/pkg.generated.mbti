@@ -31,6 +31,24 @@ fn DecisionTreeClassifier::new(max_depth? : Int, min_samples_split? : Int, min_s
 fn DecisionTreeClassifier::predict(Self, @math.Matrix) -> @math.Vector
 fn DecisionTreeClassifier::score(Self, @math.Matrix, @math.Vector) -> Double
 
+pub struct DecisionTreeRegressor {
+  mut features : Array[Int]
+  mut thresholds : Array[Double]
+  mut left : Array[Int]
+  mut right : Array[Int]
+  mut predictions : Array[Double]
+  mut is_leaf : Array[Bool]
+  mut feature_importances : Array[Double]
+  mut n_features : Int
+  mut is_fitted : Bool
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+}
+fn DecisionTreeRegressor::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn DecisionTreeRegressor::new(max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int) -> Self
+fn DecisionTreeRegressor::predict(Self, @math.Matrix) -> @math.Vector
+
 pub struct RandomForestClassifier {
   n_estimators : Int
   max_depth : Int
@@ -49,6 +67,23 @@ fn RandomForestClassifier::fit(Self, @math.Matrix, @math.Vector) -> Unit
 fn RandomForestClassifier::new(n_estimators? : Int, max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int, max_features? : Int, seed? : Int) -> Self
 fn RandomForestClassifier::predict(Self, @math.Matrix) -> @math.Vector
 fn RandomForestClassifier::score(Self, @math.Matrix, @math.Vector) -> Double
+
+pub struct RandomForestRegressor {
+  n_estimators : Int
+  max_depth : Int
+  min_samples_split : Int
+  min_samples_leaf : Int
+  max_features : Int
+  seed : Int
+  mut trees : Array[DecisionTreeRegressor]
+  mut feature_subsets : Array[Array[Int]]
+  mut n_features : Int
+  mut is_fitted : Bool
+}
+fn RandomForestRegressor::feature_importances(Self) -> @math.Vector
+fn RandomForestRegressor::fit(Self, @math.Matrix, @math.Vector) -> Unit
+fn RandomForestRegressor::new(n_estimators? : Int, max_depth? : Int, min_samples_split? : Int, min_samples_leaf? : Int, max_features? : Int, seed? : Int) -> Self
+fn RandomForestRegressor::predict(Self, @math.Matrix) -> @math.Vector
 
 // Type aliases
 
