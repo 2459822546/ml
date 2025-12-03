@@ -227,3 +227,28 @@ pub fn BatchIterator::all_batches(
   }
   result
 }
+
+///|
+/// DataLoader 迭代器封装，便于 for 循环式使用
+pub struct DataLoaderIter {
+  loader : DataLoader
+}
+
+///|
+pub fn DataLoaderIter::new(loader : DataLoader) -> DataLoaderIter {
+  let l = loader
+  l.reset()
+  { loader: l }
+}
+
+///|
+pub fn DataLoaderIter::next(
+  self : DataLoaderIter,
+) -> (Array[Array[Double]], Array[Double])? {
+  self.loader.next_batch()
+}
+
+///|
+pub fn DataLoader::iter(self : DataLoader) -> DataLoaderIter {
+  DataLoaderIter::new(self)
+}

@@ -47,16 +47,25 @@ pub struct DataLoader {
   dataset : Dataset
   batch_size : Int
   shuffle : Bool
+  drop_last : Bool
+  base_seed : Int
   mut current_epoch : Int
   indices : Array[Int]
   mut current_idx : Int
 }
 fn DataLoader::all_batches(Self) -> Array[(Array[Array[Double]], Array[Double])]
 fn DataLoader::for_each_batch(Self, (Array[Array[Double]], Array[Double]) -> Unit) -> Unit
+fn DataLoader::iter(Self) -> DataLoaderIter
 fn DataLoader::n_batches(Self) -> Int
-fn DataLoader::new(Dataset, batch_size? : Int, shuffle? : Bool) -> Self
+fn DataLoader::new(Dataset, batch_size? : Int, shuffle? : Bool, drop_last? : Bool, seed? : Int) -> Self
 fn DataLoader::next_batch(Self) -> (Array[Array[Double]], Array[Double])?
 fn DataLoader::reset(Self) -> Unit
+
+pub struct DataLoaderIter {
+  loader : DataLoader
+}
+fn DataLoaderIter::new(DataLoader) -> Self
+fn DataLoaderIter::next(Self) -> (Array[Array[Double]], Array[Double])?
 
 pub struct Dataset {
   features : Array[Array[Double]]
