@@ -1,0 +1,98 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/nn"
+
+import(
+  "2459822546/ml/math"
+)
+
+// Values
+fn act_relu() -> Activation
+
+fn act_sigmoid() -> Activation
+
+fn act_softmax() -> Activation
+
+fn act_tanh() -> Activation
+
+fn activation_forward(@math.Matrix, Activation) -> @math.Matrix
+
+fn binary_cross_entropy(Array[Double], Array[Double], eps? : Double) -> Double
+
+fn cross_entropy(Array[Int], @math.Matrix, eps? : Double) -> Double
+
+fn huber_loss(Array[Double], Array[Double], delta? : Double) -> Double
+
+fn l1_penalty(Array[Double], Double) -> Double
+
+fn l2_penalty(Array[Double], Double) -> Double
+
+fn linear_rand_init(Int, Int, scale? : Double, seed? : Int) -> Linear
+
+fn mse_loss(Array[Double], Array[Double]) -> Double
+
+fn step_decay(Double, Double, Int, Int) -> Double
+
+// Errors
+
+// Types and methods
+pub enum Activation {
+  Relu
+  Sigmoid
+  Tanh
+  Softmax
+}
+
+pub struct Adam {
+  lr : Double
+  beta1 : Double
+  beta2 : Double
+  eps : Double
+  m : Array[Double]
+  v : Array[Double]
+  mut t : Int
+}
+fn Adam::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double) -> Self
+fn Adam::step(Self, OptimParam) -> Unit
+
+pub struct Linear {
+  mut w : Array[Array[Double]]
+  mut b : Array[Double]
+  in_features : Int
+  out_features : Int
+}
+fn Linear::forward(Self, @math.Matrix) -> @math.Matrix
+fn Linear::new(Int, Int) -> Self
+fn Linear::set_params(Self, Array[Array[Double]], Array[Double]) -> Unit
+
+pub struct MLP {
+  layers : Array[Linear]
+  activations : Array[Activation]
+  output_activation : Activation
+}
+fn MLP::forward(Self, @math.Matrix) -> @math.Matrix
+fn MLP::mlp_params(Self) -> Array[OptimParam]
+fn MLP::mlp_predict(Self, @math.Matrix) -> Array[Int]
+fn MLP::mlp_predict_proba(Self, @math.Matrix) -> @math.Matrix
+fn MLP::mlp_set_params(Self, Array[OptimParam]) -> Unit
+fn MLP::new(Int, Array[Int], Int, output_activation? : Activation, seed? : Int) -> Self
+
+pub struct OptimParam {
+  data : Array[Double]
+  grad : Array[Double]
+}
+fn OptimParam::new(Array[Double]) -> Self
+fn OptimParam::with_grad(Self, Array[Double]) -> Self
+fn OptimParam::zero_grad(Self) -> Unit
+
+pub struct SGD {
+  lr : Double
+  momentum : Double
+  velocity : Array[Double]
+}
+fn SGD::new(Double, momentum? : Double, Int) -> Self
+fn SGD::step(Self, OptimParam) -> Unit
+
+// Type aliases
+
+// Traits
+
