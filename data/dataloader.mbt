@@ -5,6 +5,8 @@ pub struct DataLoader {
   dataset : Dataset
   batch_size : Int
   shuffle : Bool
+  drop_last : Bool
+  base_seed : Int
   mut current_epoch : Int
   indices : Array[Int]
   mut current_idx : Int
@@ -15,6 +17,8 @@ pub fn DataLoader::new(
   dataset : Dataset,
   batch_size? : Int = 32,
   shuffle? : Bool = false,
+  drop_last? : Bool = false,
+  seed? : Int = 42,
 ) -> DataLoader {
   if batch_size <= 0 {
     abort("batch_size 必须大于 0")
@@ -27,14 +31,30 @@ pub fn DataLoader::new(
   for i = 0; i < n_samples; i = i + 1 {
     indices[i] = i
   }
-  { dataset, batch_size, shuffle, current_epoch: 0, indices, current_idx: 0 }
+  if shuffle {
+    shuffle_indices(indices, seed)
+  }
+  {
+    dataset,
+    batch_size,
+    shuffle,
+    drop_last,
+    base_seed: seed,
+    current_epoch: 0,
+    indices,
+    current_idx: 0,
+  }
 }
 
 ///|
 /// 获取总批次数
 pub fn DataLoader::n_batches(self : DataLoader) -> Int {
   let n_samples = self.dataset.len()
-  (n_samples + self.batch_size - 1) / self.batch_size
+  if self.drop_last {
+    n_samples / self.batch_size
+  } else {
+    (n_samples + self.batch_size - 1) / self.batch_size
+  }
 }
 
 ///|
@@ -42,7 +62,7 @@ pub fn DataLoader::n_batches(self : DataLoader) -> Int {
 pub fn DataLoader::reset(self : DataLoader) -> Unit {
   self.current_idx = 0
   if self.shuffle {
-    shuffle_indices(self.indices, self.current_epoch)
+    shuffle_indices(self.indices, self.base_seed + self.current_epoch)
   }
   self.current_epoch = self.current_epoch + 1
 }
@@ -63,6 +83,10 @@ pub fn DataLoader::next_batch(
     } else {
       end
     }
+  }
+  if self.drop_last && end_idx - start_idx < self.batch_size {
+    self.current_idx = self.dataset.len()
+    return None
   }
   let actual_batch_size = end_idx - start_idx
   let batch_features = Array::make(actual_batch_size, [])
