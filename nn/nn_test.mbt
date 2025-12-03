@@ -17,6 +17,8 @@ test "activations basic" {
   assert_eq(relu.get(0, 0), 0.0)
   let sig = activation_forward(x, act_sigmoid())
   assert_true(sig.get(0, 0) < 0.5)
+  let th = activation_forward(x, act_tanh())
+  assert_true(th.get(0, 2) < 1.0 && th.get(0, 0) < 0.0)
   let sm = activation_forward(@math.Matrix::new([[1.0, 2.0]]), act_softmax())
   let s0 = sm.get(0, 0)
   let s1 = sm.get(0, 1)
@@ -62,4 +64,21 @@ test "mlp forward logits" {
   let probs = out.get_row(0)
   let sum = probs.get(0) + probs.get(1)
   assert_true((sum - 1.0).abs() < 1.0e-9)
+}
+
+///|
+test "tensor forward compat" {
+  let lin = Linear::new(2, 2)
+  let w = [[1.0, 0.0], [0.0, 1.0]]
+  let b = [0.0, 0.0]
+  lin.set_params(w, b)
+  let t = @math.Tensor::from_matrix(@math.Matrix::new([[1.0, 2.0]]))
+  let out = lin.forward_tensor(t)
+  assert_eq(out.get([0, 0]), 1.0)
+  assert_eq(out.get([0, 1]), 2.0)
+  let mlp = MLP::new(2, [2], 2, output_activation=act_softmax(), seed=2)
+  let probs = mlp.mlp_predict_proba_tensor(t)
+  let shape = probs.get_shape()
+  assert_eq(shape[0], 1)
+  assert_eq(shape[1], 2)
 }
