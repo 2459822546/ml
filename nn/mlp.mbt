@@ -73,7 +73,7 @@ pub fn MLP::new(
   dims[dims.length() - 1] = output_dim
   let mut rng = seed
   let layers = Array::make(dims.length() - 1, Linear::new(1, 1))
-  let acts = Array::make(dims.length() - 2, Relu)
+  let acts = Array::make(dims.length() - 2, Activation::Relu)
   for i = 0; i < dims.length() - 1; i = i + 1 {
     let fan_in = dims[i]
     let fan_out = dims[i + 1]
@@ -82,7 +82,7 @@ pub fn MLP::new(
     rng = rng + 17
     layers[i] = lin
     if i < acts.length() {
-      acts[i] = Relu
+      acts[i] = Activation::Relu
     }
   }
   { layers, activations: acts, output_activation }
