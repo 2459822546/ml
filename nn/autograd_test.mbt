@@ -71,6 +71,27 @@ test "dropout backward uses mask" {
 }
 
 ///|
+test "softmax cross entropy autograd" {
+  let logits = AutoTensor::new(
+    @math.Tensor::new([1.0, 2.0, 3.0, 0.5, -1.0, 2.0], [2, 3]),
+  )
+  let labels = [2, 0]
+  let loss = logits.softmax_cross_entropy(labels)
+  loss.backward()
+  let grad = logits.grad()
+  let probs = activation_forward(logits.value().to_matrix(), act_softmax())
+  let (n, c) = probs.shape()
+  for i = 0; i < n; i = i + 1 {
+    for j = 0; j < c; j = j + 1 {
+      let y = if j == labels[i] { 1.0 } else { 0.0 }
+      let expected = (probs.get(i, j) - y) / n.to_double()
+      let diff = (grad.get([i, j]) - expected).abs()
+      assert_true(diff < 1.0e-9)
+    }
+  }
+}
+
+///|
 fn batchnorm_loss(x : @math.Tensor) -> Double {
   let bn = BatchNorm1d::new(2)
   let out = bn.forward(x.to_matrix(), train=true)

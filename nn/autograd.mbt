@@ -579,6 +579,7 @@ pub enum Op {
   MaxPool2d
   AvgPool2d
   Flatten2d
+  SoftmaxCrossEntropy
 }
 
 ///|
@@ -845,6 +846,16 @@ pub fn AutoTensor::avgpool2d(
 pub fn AutoTensor::flatten2d(self : AutoTensor) -> AutoTensor {
   let g = self.graph
   let id = g.flatten2d(self.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::softmax_cross_entropy(
+  self : AutoTensor,
+  y_true : Array[Int],
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.softmax_cross_entropy(self.id, y_true)
   { graph: g, id }
 }
 
@@ -1289,6 +1300,28 @@ pub fn ComputationGraph::flatten2d(self : ComputationGraph, x : Int) -> Int {
     parents: [x],
     requires_grad: true,
     aux_tensors: [tensor_shape_to_tensor(shape)],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::softmax_cross_entropy(
+  self : ComputationGraph,
+  logits : Int,
+  labels : Array[Int],
+) -> Int {
+  let v = self.nodes[logits].value
+  let (out, probs) = tensor_softmax_cross_entropy(v, labels)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: SoftmaxCrossEntropy,
+    parents: [logits],
+    requires_grad: true,
+    aux_tensors: [probs, labels_to_tensor(labels)],
     aux_scalars: [],
     aux_bool: false,
   })
@@ -1786,6 +1819,26 @@ pub fn ComputationGraph::backward_with_grad(
         let shape = tensor_tensor_to_shape(shape_t)
         let back = tensor_reshape(g, shape)
         tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      SoftmaxCrossEntropy => {
+        let g = node.grad
+        let p = node.parents[0]
+        let probs = node.aux_tensors[0]
+        let labels = node.aux_tensors[1]
+        let shape = probs.get_shape()
+        let n = shape[0]
+        let c = shape[1]
+        let grad_logits = @math.Tensor::zeros([n, c])
+        let scale = g.get([0]) / n.to_double()
+        for i = 0; i < n; i = i + 1 {
+          let cls = labels.get([i]).to_int()
+          for j = 0; j < c; j = j + 1 {
+            let y = if j == cls { 1.0 } else { 0.0 }
+            let v = (probs.get([i, j]) - y) * scale
+            grad_logits.set([i, j], v)
+          }
+        }
+        tensor_add_inplace(self.nodes[p].grad, grad_logits)
       }
     }
   }

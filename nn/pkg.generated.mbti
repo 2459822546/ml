@@ -238,6 +238,7 @@ fn AutoTensor::maxpool2d(Self, Int, Int) -> Self
 fn AutoTensor::mul(Self, Self) -> Self
 fn AutoTensor::new(@math.Tensor, requires_grad? : Bool) -> Self
 fn AutoTensor::relu(Self) -> Self
+fn AutoTensor::softmax_cross_entropy(Self, Array[Int]) -> Self
 fn AutoTensor::sub(Self, Self) -> Self
 fn AutoTensor::sum(Self) -> Self
 fn AutoTensor::value(Self) -> @math.Tensor
@@ -343,6 +344,7 @@ fn ComputationGraph::maxpool2d(Self, Int, Int, Int) -> Int
 fn ComputationGraph::mul(Self, Int, Int) -> Int
 fn ComputationGraph::new() -> Self
 fn ComputationGraph::relu(Self, Int) -> Int
+fn ComputationGraph::softmax_cross_entropy(Self, Int, Array[Int]) -> Int
 fn ComputationGraph::sub(Self, Int, Int) -> Int
 fn ComputationGraph::sum(Self, Int) -> Int
 fn ComputationGraph::value_of(Self, Int) -> @math.Tensor
@@ -587,6 +589,7 @@ pub enum Op {
   MaxPool2d
   AvgPool2d
   Flatten2d
+  SoftmaxCrossEntropy
 }
 
 pub struct OptimParam {
