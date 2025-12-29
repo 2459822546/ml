@@ -179,6 +179,59 @@ test "log_softmax and logsumexp gradients" {
 }
 
 ///|
+test "nll loss autograd" {
+  let logp = AutoTensor::new(
+    @math.Tensor::new([-1.0, -0.1, -2.0, -0.2], [2, 2]),
+  )
+  let labels = [1, 0]
+  let loss = logp.nll_loss(labels)
+  loss.backward()
+  let g = logp.grad()
+  assert_true((g.get([0, 0]) - 0.0).abs() < 1.0e-9)
+  assert_true((g.get([0, 1]) + 0.5).abs() < 1.0e-9)
+  assert_true((g.get([1, 0]) + 0.5).abs() < 1.0e-9)
+  assert_true((g.get([1, 1]) - 0.0).abs() < 1.0e-9)
+}
+
+///|
+test "mse and mae loss autograd" {
+  let pred = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [2]))
+  let target = pred.from_other(@math.Tensor::new([0.0, 0.0], [2]))
+  let loss = pred.mse_loss(target)
+  loss.backward()
+  let g = pred.grad()
+  assert_true((g.get([0]) - 1.0).abs() < 1.0e-9)
+  assert_true((g.get([1]) - 2.0).abs() < 1.0e-9)
+  let pred2 = AutoTensor::new(@math.Tensor::new([1.0, -2.0], [2]))
+  let target2 = pred2.from_other(@math.Tensor::new([0.0, 0.0], [2]))
+  let loss2 = pred2.mae_loss(target2)
+  loss2.backward()
+  let g2 = pred2.grad()
+  assert_true((g2.get([0]) - 0.5).abs() < 1.0e-9)
+  assert_true((g2.get([1]) + 0.5).abs() < 1.0e-9)
+}
+
+///|
+test "cross entropy autograd wrapper" {
+  let logits = AutoTensor::new(
+    @math.Tensor::new([1.0, 2.0, 3.0, 0.5, -1.0, 2.0], [2, 3]),
+  )
+  let labels = [2, 0]
+  let loss = logits.cross_entropy(labels)
+  loss.backward()
+  let g = logits.grad()
+  let probs = activation_forward(logits.value().to_matrix(), act_softmax())
+  for i = 0; i < 2; i = i + 1 {
+    for j = 0; j < 3; j = j + 1 {
+      let y = if j == labels[i] { 1.0 } else { 0.0 }
+      let expected = (probs.get(i, j) - y) / 2.0
+      let diff = (g.get([i, j]) - expected).abs()
+      assert_true(diff < 1.0e-9)
+    }
+  }
+}
+
+///|
 fn batchnorm_loss(x : @math.Tensor) -> Double {
   let bn = BatchNorm1d::new(2)
   let out = bn.forward(x.to_matrix(), train=true)
