@@ -92,6 +92,93 @@ test "softmax cross entropy autograd" {
 }
 
 ///|
+test "sum and mean axis gradients" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let y = x.sum_axis(1)
+  let loss = y.sum()
+  loss.backward()
+  let g = x.grad()
+  assert_true((g.get([0, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((g.get([0, 1]) - 1.0).abs() < 1.0e-9)
+  assert_true((g.get([1, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((g.get([1, 1]) - 1.0).abs() < 1.0e-9)
+  let x2 = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let y2 = x2.mean_axis(0)
+  let loss2 = y2.sum()
+  loss2.backward()
+  let g2 = x2.grad()
+  assert_true((g2.get([0, 0]) - 0.5).abs() < 1.0e-9)
+  assert_true((g2.get([1, 0]) - 0.5).abs() < 1.0e-9)
+}
+
+///|
+test "reshape and transpose gradients" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let y = x.reshape([4, 1])
+  let loss = y.sum()
+  loss.backward()
+  let g = x.grad()
+  assert_true((g.get([0, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((g.get([1, 1]) - 1.0).abs() < 1.0e-9)
+  let x2 = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let y2 = x2.transpose(axes=[1, 0])
+  let loss2 = y2.sum()
+  loss2.backward()
+  let g2 = x2.grad()
+  assert_true((g2.get([0, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((g2.get([1, 1]) - 1.0).abs() < 1.0e-9)
+}
+
+///|
+test "broadcast add gradient" {
+  let a = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let b = a.from_other(@math.Tensor::new([1.0, 2.0], [1, 2]))
+  let y = a.add(b)
+  let loss = y.sum()
+  loss.backward()
+  let ga = a.grad()
+  let gb = b.grad()
+  assert_true((ga.get([0, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((ga.get([1, 1]) - 1.0).abs() < 1.0e-9)
+  assert_true((gb.get([0, 0]) - 2.0).abs() < 1.0e-9)
+  assert_true((gb.get([0, 1]) - 2.0).abs() < 1.0e-9)
+}
+
+///|
+test "log_softmax and logsumexp gradients" {
+  let x = AutoTensor::new(
+    @math.Tensor::new([1.0, 2.0, 3.0, 0.5, -1.0, 2.0], [2, 3]),
+  )
+  let y = x.log_softmax(axis=1)
+  let loss = y.sum()
+  loss.backward()
+  let g = x.grad()
+  let probs = activation_forward(x.value().to_matrix(), act_softmax())
+  for i = 0; i < 2; i = i + 1 {
+    let sum_g = 3.0
+    for j = 0; j < 3; j = j + 1 {
+      let expected = 1.0 - probs.get(i, j) * sum_g
+      let diff = (g.get([i, j]) - expected).abs()
+      assert_true(diff < 1.0e-9)
+    }
+  }
+  let x2 = AutoTensor::new(
+    @math.Tensor::new([1.0, 2.0, 3.0, 0.5, -1.0, 2.0], [2, 3]),
+  )
+  let y2 = x2.logsumexp(axis=1)
+  let loss2 = y2.sum()
+  loss2.backward()
+  let g2 = x2.grad()
+  let probs2 = activation_forward(x2.value().to_matrix(), act_softmax())
+  for i = 0; i < 2; i = i + 1 {
+    for j = 0; j < 3; j = j + 1 {
+      let diff = (g2.get([i, j]) - probs2.get(i, j)).abs()
+      assert_true(diff < 1.0e-9)
+    }
+  }
+}
+
+///|
 fn batchnorm_loss(x : @math.Tensor) -> Double {
   let bn = BatchNorm1d::new(2)
   let out = bn.forward(x.to_matrix(), train=true)
