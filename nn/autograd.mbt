@@ -310,6 +310,61 @@ fn tensor_layernorm_forward(
 }
 
 ///|
+fn tensor_conv2d(
+  x : @math.Tensor,
+  w : @math.Tensor,
+  b : @math.Tensor,
+  stride : Int,
+  padding : Int,
+) -> @math.Tensor {
+  let shape_x = x.get_shape()
+  let shape_w = w.get_shape()
+  if shape_x.length() != 4 || shape_w.length() != 4 {
+    abort("conv2d 仅支持 4D 张量")
+  }
+  let n = shape_x[0]
+  let cin = shape_x[1]
+  let h = shape_x[2]
+  let wi = shape_x[3]
+  let cout = shape_w[0]
+  let cin_w = shape_w[1]
+  let kh = shape_w[2]
+  let kw = shape_w[3]
+  if cin != cin_w {
+    abort("conv2d 输入通道不匹配")
+  }
+  if b.get_shape() != [cout] {
+    abort("conv2d bias 形状不匹配")
+  }
+  let out_h = (h + 2 * padding - kh) / stride + 1
+  let out_w = (wi + 2 * padding - kw) / stride + 1
+  let out = @math.Tensor::zeros([n, cout, out_h, out_w])
+  for ni = 0; ni < n; ni = ni + 1 {
+    for co = 0; co < cout; co = co + 1 {
+      for oh = 0; oh < out_h; oh = oh + 1 {
+        for ow = 0; ow < out_w; ow = ow + 1 {
+          let mut sum = b.get([co])
+          for ci = 0; ci < cin; ci = ci + 1 {
+            for khi = 0; khi < kh; khi = khi + 1 {
+              for kwi = 0; kwi < kw; kwi = kwi + 1 {
+                let ih = oh * stride + khi - padding
+                let iw = ow * stride + kwi - padding
+                if ih >= 0 && ih < h && iw >= 0 && iw < wi {
+                  sum = sum + x.get([ni, ci, ih, iw]) *
+                    w.get([co, ci, khi, kwi])
+                }
+              }
+            }
+          }
+          out.set([ni, co, oh, ow], sum)
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
 pub enum Op {
   Input
   Add
@@ -550,6 +605,19 @@ pub fn AutoTensor::embedding(
 ) -> AutoTensor {
   let g = self.graph
   let id = g.embedding(weight.id, self.value())
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::conv2d(
+  self : AutoTensor,
+  weight : AutoTensor,
+  bias : AutoTensor,
+  stride : Int,
+  padding : Int,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.conv2d(self.id, weight.id, bias.id, stride, padding)
   { graph: g, id }
 }
 
@@ -896,6 +964,33 @@ pub fn ComputationGraph::embedding(
     requires_grad: true,
     aux_tensors: [indices],
     aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::conv2d(
+  self : ComputationGraph,
+  x : Int,
+  weight : Int,
+  bias : Int,
+  stride : Int,
+  padding : Int,
+) -> Int {
+  let vx = self.nodes[x].value
+  let vw = self.nodes[weight].value
+  let vb = self.nodes[bias].value
+  let out = tensor_conv2d(vx, vw, vb, stride, padding)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Conv2d,
+    parents: [x, weight, bias],
+    requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [stride.to_double(), padding.to_double()],
     aux_bool: false,
   })
   self.nodes.length() - 1
@@ -1262,6 +1357,64 @@ pub fn ComputationGraph::backward_with_grad(
           }
         }
         tensor_add_inplace(self.nodes[weight_id].grad, grad_w)
+      }
+      Conv2d => {
+        let g = node.grad
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        let p2 = node.parents[2]
+        let x = self.nodes[p0].value
+        let w = self.nodes[p1].value
+        let shape_x = x.get_shape()
+        let shape_w = w.get_shape()
+        let n = shape_x[0]
+        let cin = shape_x[1]
+        let h = shape_x[2]
+        let wi = shape_x[3]
+        let cout = shape_w[0]
+        let kh = shape_w[2]
+        let kw = shape_w[3]
+        let shape_g = g.get_shape()
+        let out_h = shape_g[2]
+        let out_w = shape_g[3]
+        let stride = node.aux_scalars[0].to_int()
+        let padding = node.aux_scalars[1].to_int()
+        let grad_x = @math.Tensor::zeros([n, cin, h, wi])
+        let grad_w = @math.Tensor::zeros([cout, cin, kh, kw])
+        let grad_b = @math.Tensor::zeros([cout])
+        for ni = 0; ni < n; ni = ni + 1 {
+          for co = 0; co < cout; co = co + 1 {
+            for oh = 0; oh < out_h; oh = oh + 1 {
+              for ow = 0; ow < out_w; ow = ow + 1 {
+                let gg = g.get([ni, co, oh, ow])
+                grad_b.set([co], grad_b.get([co]) + gg)
+                for ci = 0; ci < cin; ci = ci + 1 {
+                  for khi = 0; khi < kh; khi = khi + 1 {
+                    for kwi = 0; kwi < kw; kwi = kwi + 1 {
+                      let ih = oh * stride + khi - padding
+                      let iw = ow * stride + kwi - padding
+                      if ih >= 0 && ih < h && iw >= 0 && iw < wi {
+                        grad_x.set(
+                          [ni, ci, ih, iw],
+                          grad_x.get([ni, ci, ih, iw]) +
+                          gg * w.get([co, ci, khi, kwi]),
+                        )
+                        grad_w.set(
+                          [co, ci, khi, kwi],
+                          grad_w.get([co, ci, khi, kwi]) +
+                          gg * x.get([ni, ci, ih, iw]),
+                        )
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        tensor_add_inplace(self.nodes[p0].grad, grad_x)
+        tensor_add_inplace(self.nodes[p1].grad, grad_w)
+        tensor_add_inplace(self.nodes[p2].grad, grad_b)
       }
     }
   }
