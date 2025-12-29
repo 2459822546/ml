@@ -189,6 +189,84 @@ fn tensor_sum_all(x : @math.Tensor) -> @math.Tensor {
 }
 
 ///|
+fn tensor_dropout(
+  x : @math.Tensor,
+  rate : Double,
+  seed : Int,
+) -> (@math.Tensor, @math.Tensor, Int) {
+  let shape = x.get_shape()
+  let strides = compute_strides(shape)
+  let total = x.total_size()
+  let data = Array::make(total, 0.0)
+  let mask = Array::make(total, 0.0)
+  let keep = 1.0 - rate
+  let scale = 1.0 / keep
+  let mut rng = seed
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    rng = (1103515245 * rng + 12345) & 0x7fffffff
+    let r = rng.to_double() / (0x7fffffff).to_double()
+    if r < keep {
+      let v = x.get(idx) * scale
+      data[i] = v
+      mask[i] = scale
+    } else {
+      data[i] = 0.0
+      mask[i] = 0.0
+    }
+  }
+  (@math.Tensor::new(data, shape), @math.Tensor::new(mask, shape), rng)
+}
+
+///|
+fn tensor_layernorm_forward(
+  x : @math.Tensor,
+  gamma : @math.Tensor,
+  beta : @math.Tensor,
+  eps : Double,
+) -> (@math.Tensor, @math.Tensor, @math.Tensor) {
+  let shape = x.get_shape()
+  if shape.length() != 2 {
+    abort("layernorm 仅支持 2D 张量")
+  }
+  let n = shape[0]
+  let m = shape[1]
+  if gamma.get_shape() != [m] || beta.get_shape() != [m] {
+    abort("layernorm 维度不匹配")
+  }
+  let data = Array::make(n * m, 0.0)
+  let mean = Array::make(n, 0.0)
+  let variance = Array::make(n, 0.0)
+  let mut idx = 0
+  for i = 0; i < n; i = i + 1 {
+    let mut sum = 0.0
+    for j = 0; j < m; j = j + 1 {
+      sum = sum + x.get([i, j])
+    }
+    let mu = sum / m.to_double()
+    mean[i] = mu
+    let mut var_val = 0.0
+    for j = 0; j < m; j = j + 1 {
+      let diff = x.get([i, j]) - mu
+      var_val = var_val + diff * diff
+    }
+    var_val = var_val / m.to_double()
+    variance[i] = var_val
+    let denom = (var_val + eps).sqrt()
+    for j = 0; j < m; j = j + 1 {
+      let norm = (x.get([i, j]) - mu) / denom
+      data[idx] = norm * gamma.get([j]) + beta.get([j])
+      idx = idx + 1
+    }
+  }
+  (
+    @math.Tensor::new(data, [n, m]),
+    @math.Tensor::new(mean, [n]),
+    @math.Tensor::new(variance, [n]),
+  )
+}
+
+///|
 pub enum Op {
   Input
   Add
