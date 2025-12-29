@@ -97,6 +97,76 @@ fn module_batchnorm_forward_tensor(
 }
 
 ///|
+fn module_batchnorm2d_stats(x : @math.Tensor) -> (Array[Double], Array[Double]) {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("batchnorm2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let mean = Array::make(c, 0.0)
+  let variance = Array::make(c, 0.0)
+  for ci = 0; ci < c; ci = ci + 1 {
+    let mut sum = 0.0
+    for ni = 0; ni < n; ni = ni + 1 {
+      for hi = 0; hi < h; hi = hi + 1 {
+        for wi = 0; wi < w; wi = wi + 1 {
+          sum = sum + x.get([ni, ci, hi, wi])
+        }
+      }
+    }
+    mean[ci] = sum / (n * h * w).to_double()
+  }
+  for ci = 0; ci < c; ci = ci + 1 {
+    let mut sum = 0.0
+    for ni = 0; ni < n; ni = ni + 1 {
+      for hi = 0; hi < h; hi = hi + 1 {
+        for wi = 0; wi < w; wi = wi + 1 {
+          let diff = x.get([ni, ci, hi, wi]) - mean[ci]
+          sum = sum + diff * diff
+        }
+      }
+    }
+    variance[ci] = sum / (n * h * w).to_double()
+  }
+  (mean, variance)
+}
+
+///|
+fn module_batchnorm2d_forward_tensor(
+  x : @math.Tensor,
+  gamma : @math.Tensor,
+  beta : @math.Tensor,
+  mean : Array[Double],
+  variance : Array[Double],
+  eps : Double,
+) -> @math.Tensor {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("batchnorm2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let out = @math.Tensor::zeros([n, c, h, w])
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      let inv_std = 1.0 / (variance[ci] + eps).sqrt()
+      for hi = 0; hi < h; hi = hi + 1 {
+        for wi = 0; wi < w; wi = wi + 1 {
+          let norm = (x.get([ni, ci, hi, wi]) - mean[ci]) * inv_std
+          out.set([ni, ci, hi, wi], norm * gamma.get([ci]) + beta.get([ci]))
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
 pub fn Parameter::new(
   data : @math.Tensor,
   requires_grad? : Bool = true,
