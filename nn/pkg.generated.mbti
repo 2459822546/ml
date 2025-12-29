@@ -16,9 +16,11 @@ fn act_tanh() -> Activation
 
 fn activation_forward(@math.Matrix, Activation) -> @math.Matrix
 
+fn activation_forward_tensor(@math.Tensor, Activation) -> @math.Tensor
+
 fn binary_cross_entropy(Array[Double], Array[Double], eps? : Double) -> Double
 
-fn cross_entropy(Array[Int], @math.Matrix, eps? : Double) -> Double
+fn cross_entropy(Array[Int], @math.Matrix) -> Double
 
 fn huber_loss(Array[Double], Array[Double], delta? : Double) -> Double
 
@@ -54,6 +56,20 @@ pub struct Adam {
 fn Adam::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double) -> Self
 fn Adam::step(Self, OptimParam) -> Unit
 
+pub struct ComputationGraph {
+  nodes : Array[Node]
+}
+fn ComputationGraph::add(Self, Int, Int) -> Int
+fn ComputationGraph::add_input(Self, @math.Tensor, requires_grad? : Bool) -> Int
+fn ComputationGraph::backward(Self, Int) -> Unit
+fn ComputationGraph::backward_with_grad(Self, Int, @math.Tensor) -> Unit
+fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
+fn ComputationGraph::mul(Self, Int, Int) -> Int
+fn ComputationGraph::new() -> Self
+fn ComputationGraph::relu(Self, Int) -> Int
+fn ComputationGraph::sub(Self, Int, Int) -> Int
+fn ComputationGraph::value_of(Self, Int) -> @math.Tensor
+
 pub struct Linear {
   mut w : Array[Array[Double]]
   mut b : Array[Double]
@@ -61,6 +77,7 @@ pub struct Linear {
   out_features : Int
 }
 fn Linear::forward(Self, @math.Matrix) -> @math.Matrix
+fn Linear::forward_tensor(Self, @math.Tensor) -> @math.Tensor
 fn Linear::new(Int, Int) -> Self
 fn Linear::set_params(Self, Array[Array[Double]], Array[Double]) -> Unit
 
@@ -70,11 +87,30 @@ pub struct MLP {
   output_activation : Activation
 }
 fn MLP::forward(Self, @math.Matrix) -> @math.Matrix
+fn MLP::forward_tensor(Self, @math.Tensor) -> @math.Tensor
 fn MLP::mlp_params(Self) -> Array[OptimParam]
 fn MLP::mlp_predict(Self, @math.Matrix) -> Array[Int]
 fn MLP::mlp_predict_proba(Self, @math.Matrix) -> @math.Matrix
+fn MLP::mlp_predict_proba_tensor(Self, @math.Tensor) -> @math.Tensor
+fn MLP::mlp_predict_tensor(Self, @math.Tensor) -> Array[Int]
 fn MLP::mlp_set_params(Self, Array[OptimParam]) -> Unit
 fn MLP::new(Int, Array[Int], Int, output_activation? : Activation, seed? : Int) -> Self
+
+pub struct Node {
+  value : @math.Tensor
+  mut grad : @math.Tensor
+  op : Op
+  parents : Array[Int]
+  requires_grad : Bool
+}
+
+pub enum Op {
+  Input
+  Add
+  Sub
+  Mul
+  Relu
+}
 
 pub struct OptimParam {
   data : Array[Double]
@@ -89,7 +125,7 @@ pub struct SGD {
   momentum : Double
   velocity : Array[Double]
 }
-fn SGD::new(Double, momentum? : Double, Int) -> Self
+fn SGD::new(Double, Int, momentum? : Double) -> Self
 fn SGD::step(Self, OptimParam) -> Unit
 
 // Type aliases
