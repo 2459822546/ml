@@ -30,6 +30,14 @@ pub fn no_grad_exit(state : NoGradGuard) -> Unit {
 }
 
 ///|
+pub fn[T] no_grad(f : () -> T) -> T {
+  let state : NoGradGuard = no_grad_enter()
+  let out = f()
+  no_grad_exit(state)
+  out
+}
+
+///|
 pub struct InferenceModeGuard {
   prev : Bool
 }
@@ -44,6 +52,14 @@ pub fn inference_mode_enter() -> InferenceModeGuard {
 ///|
 pub fn inference_mode_exit(state : InferenceModeGuard) -> Unit {
   inference_mode_flag.val = state.prev
+}
+
+///|
+pub fn[T] inference_mode(f : () -> T) -> T {
+  let state : InferenceModeGuard = inference_mode_enter()
+  let out = f()
+  inference_mode_exit(state)
+  out
 }
 
 ///|

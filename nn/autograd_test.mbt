@@ -76,6 +76,20 @@ test "no_grad and inference_mode disable graph" {
   let g2 = x2.grad()
   assert_true(g2.get([0]).abs() < 1.0e-9)
   assert_true(g2.get([1]).abs() < 1.0e-9)
+  let x3 = AutoTensor::new(@math.Tensor::new([3.0, 4.0], [2]))
+  let y3 = no_grad(() => x3.add(x3))
+  let loss3 = y3.sum()
+  loss3.backward()
+  let g3 = x3.grad()
+  assert_true(g3.get([0]).abs() < 1.0e-9)
+  assert_true(g3.get([1]).abs() < 1.0e-9)
+  let x4 = AutoTensor::new(@math.Tensor::new([5.0, 6.0], [2]))
+  let y4 = inference_mode(() => x4.mul(x4))
+  let loss4 = y4.sum()
+  loss4.backward()
+  let g4 = x4.grad()
+  assert_true(g4.get([0]).abs() < 1.0e-9)
+  assert_true(g4.get([1]).abs() < 1.0e-9)
 }
 
 ///|

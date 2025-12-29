@@ -35,11 +35,15 @@ fn early_stopping_min(Int, min_delta? : Double) -> EarlyStopping
 
 fn eval_step(Sequential, AutoTensor, Array[Int]) -> Double
 
+fn eval_step_batch(Sequential, @data.Batch) -> Double
+
 fn focal_loss_binary(Array[Double], Array[Double], gamma? : Double, alpha? : Double, eps? : Double) -> Double
 
 fn hinge_loss(Array[Double], Array[Double]) -> Double
 
 fn huber_loss(Array[Double], Array[Double], delta? : Double) -> Double
+
+fn[T] inference_mode(() -> T) -> T
 
 fn inference_mode_enter() -> InferenceModeGuard
 
@@ -114,6 +118,8 @@ fn module_train(Module) -> Module
 fn mse_loss(Array[Double], Array[Double]) -> Double
 
 fn multilabel_binary_cross_entropy(Array[Array[Double]], Array[Array[Double]], eps? : Double) -> Double
+
+fn[T] no_grad(() -> T) -> T
 
 fn no_grad_enter() -> NoGradGuard
 
