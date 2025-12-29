@@ -57,7 +57,13 @@ fn mlp_train_loop(MLP, @data.DataLoader, Int, (MLP, Array[Array[Double]], Array[
 
 fn module_batchnorm1d(BatchNorm1d) -> Module
 
+fn module_batchnorm2d(BatchNorm2d) -> Module
+
+fn module_conv2d(Conv2dModule) -> Module
+
 fn module_dropout(Dropout) -> Module
+
+fn module_dropout2d(Dropout2d) -> Module
 
 fn module_embedding(Embedding) -> Module
 
@@ -207,7 +213,10 @@ fn AutoTensor::add_bias(Self, Self) -> Self
 fn AutoTensor::backward(Self) -> Unit
 fn AutoTensor::backward_with_grad(Self, @math.Tensor) -> Unit
 fn AutoTensor::batchnorm1d_cached(Self, @math.Tensor, @math.Tensor, @math.Tensor, Self, Self, Double, train? : Bool) -> Self
+fn AutoTensor::batchnorm2d_cached(Self, @math.Tensor, @math.Tensor, @math.Tensor, Self, Self, Double, train? : Bool) -> Self
+fn AutoTensor::conv2d(Self, Self, Self, Int, Int) -> Self
 fn AutoTensor::dropout(Self, Double, Int, train? : Bool) -> (Self, Int)
+fn AutoTensor::dropout2d(Self, Double, Int, train? : Bool) -> (Self, Int)
 fn AutoTensor::embedding(Self, Self) -> Self
 fn AutoTensor::from_other(Self, @math.Tensor, requires_grad? : Bool) -> Self
 fn AutoTensor::grad(Self) -> @math.Tensor
@@ -254,6 +263,36 @@ fn BatchNorm1dModule::new(Int, momentum? : Double, eps? : Double) -> Self
 fn BatchNorm1dModule::parameters(Self) -> Array[Parameter]
 fn BatchNorm1dModule::sync_grads(Self, BatchNorm1dContext) -> Unit
 
+pub struct BatchNorm2d {
+  gamma : Array[Double]
+  beta : Array[Double]
+  running_mean : Array[Double]
+  running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+fn BatchNorm2d::forward(Self, @math.Tensor, train? : Bool) -> @math.Tensor
+fn BatchNorm2d::new(Int, momentum? : Double, eps? : Double) -> Self
+
+pub struct BatchNorm2dContext {
+  gamma : AutoTensor
+  beta : AutoTensor
+}
+
+pub struct BatchNorm2dModule {
+  gamma : Parameter
+  beta : Parameter
+  mut running_mean : Array[Double]
+  mut running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+fn BatchNorm2dModule::forward(Self, AutoTensor, train? : Bool) -> (AutoTensor, BatchNorm2dContext)
+fn BatchNorm2dModule::from_layer(BatchNorm2d) -> Self
+fn BatchNorm2dModule::new(Int, momentum? : Double, eps? : Double) -> Self
+fn BatchNorm2dModule::parameters(Self) -> Array[Parameter]
+fn BatchNorm2dModule::sync_grads(Self, BatchNorm2dContext) -> Unit
+
 pub struct ComputationGraph {
   nodes : Array[Node]
 }
@@ -263,7 +302,10 @@ fn ComputationGraph::add_input(Self, @math.Tensor, requires_grad? : Bool) -> Int
 fn ComputationGraph::backward(Self, Int) -> Unit
 fn ComputationGraph::backward_with_grad(Self, Int, @math.Tensor) -> Unit
 fn ComputationGraph::batchnorm1d_cached(Self, Int, Int, Int, @math.Tensor, @math.Tensor, @math.Tensor, Double, train? : Bool) -> Int
+fn ComputationGraph::batchnorm2d_cached(Self, Int, Int, Int, @math.Tensor, @math.Tensor, @math.Tensor, Double, train? : Bool) -> Int
+fn ComputationGraph::conv2d(Self, Int, Int, Int, Int, Int) -> Int
 fn ComputationGraph::dropout(Self, Int, Double, Int) -> (Int, Int)
+fn ComputationGraph::dropout2d(Self, Int, Double, Int) -> (Int, Int)
 fn ComputationGraph::embedding(Self, Int, @math.Tensor) -> Int
 fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
 fn ComputationGraph::layernorm(Self, Int, Int, Int, Double) -> Int
@@ -275,12 +317,46 @@ fn ComputationGraph::sub(Self, Int, Int) -> Int
 fn ComputationGraph::sum(Self, Int) -> Int
 fn ComputationGraph::value_of(Self, Int) -> @math.Tensor
 
+pub struct Conv2d {
+  mut weight : @math.Tensor
+  mut bias : @math.Tensor
+  stride : Int
+  padding : Int
+}
+fn Conv2d::forward(Self, @math.Tensor) -> @math.Tensor
+fn Conv2d::new(Int, Int, Int, stride? : Int, padding? : Int, seed? : Int) -> Self
+fn Conv2d::set_params(Self, @math.Tensor, @math.Tensor) -> Unit
+
+pub struct Conv2dContext {
+  weight : AutoTensor
+  bias : AutoTensor
+}
+
+pub struct Conv2dModule {
+  weight : Parameter
+  bias : Parameter
+  stride : Int
+  padding : Int
+}
+fn Conv2dModule::forward(Self, AutoTensor) -> (AutoTensor, Conv2dContext)
+fn Conv2dModule::new(Int, Int, Int, stride? : Int, padding? : Int, seed? : Int) -> Self
+fn Conv2dModule::parameters(Self) -> Array[Parameter]
+fn Conv2dModule::set_params(Self, @math.Tensor, @math.Tensor) -> Unit
+fn Conv2dModule::sync_grads(Self, Conv2dContext) -> Unit
+
 pub struct Dropout {
   rate : Double
   mut seed : Int
 }
 fn Dropout::forward(Self, @math.Matrix, train? : Bool) -> @math.Matrix
 fn Dropout::new(Double, seed? : Int) -> Self
+
+pub struct Dropout2d {
+  rate : Double
+  mut seed : Int
+}
+fn Dropout2d::forward(Self, @math.Tensor, train? : Bool) -> @math.Tensor
+fn Dropout2d::new(Double, seed? : Int) -> Self
 
 pub struct EarlyStopping {
   mode : EarlyStoppingMode
@@ -396,9 +472,12 @@ pub enum Module {
   Linear(LinearModule)
   Relu
   Dropout(Dropout)
+  Dropout2d(Dropout2d)
   BatchNorm1d(BatchNorm1dModule)
+  BatchNorm2d(BatchNorm2dModule)
   LayerNorm(LayerNormModule)
   Embedding(EmbeddingModule)
+  Conv2d(Conv2dModule)
   Sequential(Sequential)
   ModuleList(ModuleList)
 }
@@ -407,8 +486,10 @@ pub enum ModuleContext {
   None
   Linear(LinearContext)
   BatchNorm1d(BatchNorm1dContext)
+  BatchNorm2d(BatchNorm2dContext)
   LayerNorm(LayerNormContext)
   Embedding(EmbeddingContext)
+  Conv2d(Conv2dContext)
   Sequential(Array[ModuleContext])
 }
 
@@ -444,9 +525,12 @@ pub enum Op {
   AddBias
   Sum
   Dropout
+  Dropout2d
   BatchNorm1d
+  BatchNorm2d
   LayerNorm
   Embedding
+  Conv2d
 }
 
 pub struct OptimParam {
