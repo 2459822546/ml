@@ -100,13 +100,77 @@ pub struct Dataset {
   features : Array[Array[Double]]
   labels : Array[Double]
 }
+fn Dataset::from_samples(Array[Sample]) -> Self
 fn Dataset::get(Self, Int) -> (Array[Double], Double)
+fn Dataset::get_batch(Self, Array[Int]) -> (Array[Array[Double]], Array[Double])
 fn Dataset::get_features(Self) -> Array[Array[Double]]
 fn Dataset::get_labels(Self) -> Array[Double]
 fn Dataset::len(Self) -> Int
+fn Dataset::map(Self, (Array[Double], Double) -> (Array[Double], Double)) -> Self
 fn Dataset::n_features(Self) -> Int
 fn Dataset::new(Array[Array[Double]], Array[Double]) -> Self
+fn Dataset::range(Self, Int, Int) -> Self
+fn Dataset::shuffle(Self, Int) -> Self
 fn Dataset::slice(Self, Int, Int) -> Self
+fn Dataset::to_samples(Self) -> Array[Sample]
+
+pub struct MultiDataLoader {
+  dataset : MultiDataset
+  batch_size : Int
+  shuffle : Bool
+  drop_last : Bool
+  mut base_seed : Int
+  num_workers : Int
+  mut current_epoch : Int
+  indices : Array[Int]
+  mut current_idx : Int
+}
+fn MultiDataLoader::all_batches(Self) -> Array[(Array[Array[Double]], Array[Array[Double]])]
+fn MultiDataLoader::epoch_seed(Self) -> Int
+fn MultiDataLoader::for_each_batch(Self, (Array[Array[Double]], Array[Array[Double]]) -> Unit) -> Unit
+fn MultiDataLoader::iter(Self) -> MultiDataLoaderIter
+fn MultiDataLoader::n_batches(Self) -> Int
+fn MultiDataLoader::new(MultiDataset, batch_size? : Int, shuffle? : Bool, drop_last? : Bool, seed? : Int, num_workers? : Int) -> Self
+fn MultiDataLoader::next_batch(Self) -> (Array[Array[Double]], Array[Array[Double]])?
+fn MultiDataLoader::reset(Self) -> Unit
+fn MultiDataLoader::set_seed(Self, Int) -> Unit
+
+pub struct MultiDataLoaderIter {
+  loader : MultiDataLoader
+}
+fn MultiDataLoaderIter::new(MultiDataLoader) -> Self
+fn MultiDataLoaderIter::next(Self) -> (Array[Array[Double]], Array[Array[Double]])?
+
+pub struct MultiDataset {
+  features : Array[Array[Double]]
+  labels : Array[Array[Double]]
+}
+fn MultiDataset::from_samples(Array[MultiSample]) -> Self
+fn MultiDataset::get(Self, Int) -> (Array[Double], Array[Double])
+fn MultiDataset::get_batch(Self, Array[Int]) -> (Array[Array[Double]], Array[Array[Double]])
+fn MultiDataset::get_features(Self) -> Array[Array[Double]]
+fn MultiDataset::get_labels(Self) -> Array[Array[Double]]
+fn MultiDataset::len(Self) -> Int
+fn MultiDataset::map(Self, (Array[Double], Array[Double]) -> (Array[Double], Array[Double])) -> Self
+fn MultiDataset::n_features(Self) -> Int
+fn MultiDataset::n_labels(Self) -> Int
+fn MultiDataset::new(Array[Array[Double]], Array[Array[Double]]) -> Self
+fn MultiDataset::range(Self, Int, Int) -> Self
+fn MultiDataset::shuffle(Self, Int) -> Self
+fn MultiDataset::slice(Self, Int, Int) -> Self
+fn MultiDataset::to_samples(Self) -> Array[MultiSample]
+
+pub struct MultiSample {
+  features : Array[Double]
+  labels : Array[Double]
+}
+fn MultiSample::new(Array[Double], Array[Double]) -> Self
+
+pub struct Sample {
+  features : Array[Double]
+  label : Double
+}
+fn Sample::new(Array[Double], Double) -> Self
 
 // Type aliases
 
