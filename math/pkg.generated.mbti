@@ -12,6 +12,10 @@ fn covariance(Array[Double], Array[Double]) -> Double
 
 fn determinant(Matrix) -> Double
 
+fn device_eq(Device, Device) -> Bool
+
+fn dtype_eq(DType, DType) -> Bool
+
 fn eigen_decomposition(Matrix, Int, Int, Double) -> EigenDecomposition
 
 fn euclidean_distance(Array[Double], Array[Double]) -> Double
@@ -50,6 +54,21 @@ fn trace(Matrix) -> Double
 pub struct CholeskyDecomposition {
   l : Matrix
 }
+
+pub(all) enum DType {
+  Float64
+  Float32
+  Int64
+  Int32
+  Bool
+}
+fn DType::to_string(Self) -> String
+
+pub(all) enum Device {
+  CPU
+  GPU
+}
+fn Device::to_string(Self) -> String
 
 pub struct EigenDecomposition {
   values : Vector
@@ -109,14 +128,19 @@ pub struct Tensor {
   shape : Array[Int]
   strides : Array[Int]
   size : Int
+  dtype : DType
+  device : Device
 }
 fn Tensor::concat(Int, Array[Self]) -> Self
 fn Tensor::copy(Self) -> Self
 fn Tensor::fill(Array[Int], Double) -> Self
+fn Tensor::fill_with_meta(Array[Int], Double, DType, Device) -> Self
 fn Tensor::flatten(Self) -> Self
 fn Tensor::from_matrix(Matrix) -> Self
 fn Tensor::from_vector(Vector) -> Self
 fn Tensor::get(Self, Array[Int]) -> Double
+fn Tensor::get_device(Self) -> Device
+fn Tensor::get_dtype(Self) -> DType
 fn Tensor::get_shape(Self) -> Array[Int]
 fn Tensor::hadamard(Self, Self) -> Self
 fn Tensor::map(Self, (Double) -> Double) -> Self
@@ -127,7 +151,9 @@ fn Tensor::mean_axis(Self, Int) -> Self
 fn Tensor::min(Self) -> Double
 fn Tensor::ndim(Self) -> Int
 fn Tensor::new(Array[Double], Array[Int]) -> Self
+fn Tensor::new_with_meta(Array[Double], Array[Int], DType, Device) -> Self
 fn Tensor::ones(Array[Int]) -> Self
+fn Tensor::ones_with_meta(Array[Int], DType, Device) -> Self
 fn Tensor::op_add(Self, Self) -> Self
 fn Tensor::op_div(Self, Self) -> Self
 fn Tensor::op_mul(Self, Self) -> Self
@@ -140,12 +166,16 @@ fn Tensor::stack(Int, Array[Self]) -> Self
 fn Tensor::sum(Self) -> Double
 fn Tensor::sum_axes(Self, Array[Int], keepdim? : Bool) -> Self
 fn Tensor::sum_axis(Self, Int) -> Self
+fn Tensor::to_device(Self, Device) -> Self
 fn Tensor::to_matrix(Self) -> Matrix
 fn Tensor::to_string(Self) -> String
 fn Tensor::to_vector(Self) -> Vector
 fn Tensor::total_size(Self) -> Int
 fn Tensor::transpose(Self, axes? : Array[Int]) -> Self
+fn Tensor::with_device(Self, Device) -> Self
+fn Tensor::with_dtype(Self, DType) -> Self
 fn Tensor::zeros(Array[Int]) -> Self
+fn Tensor::zeros_with_meta(Array[Int], DType, Device) -> Self
 impl Add for Tensor
 impl Div for Tensor
 impl Mul for Tensor

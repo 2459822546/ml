@@ -1,16 +1,83 @@
 ///|
 /// 张量 (Tensor)
 /// 多维数值数组，支持任意维度的张量运算
+pub(all) enum DType {
+  Float64
+  Float32
+  Int64
+  Int32
+  Bool
+}
+
+///|
+pub fn dtype_eq(a : DType, b : DType) -> Bool {
+  match (a, b) {
+    (Float64, Float64) => true
+    (Float32, Float32) => true
+    (Int64, Int64) => true
+    (Int32, Int32) => true
+    (Bool, Bool) => true
+    _ => false
+  }
+}
+
+///|
+pub fn DType::to_string(self : DType) -> String {
+  match self {
+    Float64 => "float64"
+    Float32 => "float32"
+    Int64 => "int64"
+    Int32 => "int32"
+    Bool => "bool"
+  }
+}
+
+///|
+pub(all) enum Device {
+  CPU
+  GPU
+}
+
+///|
+pub fn device_eq(a : Device, b : Device) -> Bool {
+  match (a, b) {
+    (CPU, CPU) => true
+    (GPU, GPU) => true
+    _ => false
+  }
+}
+
+///|
+pub fn Device::to_string(self : Device) -> String {
+  match self {
+    CPU => "cpu"
+    GPU => "gpu"
+  }
+}
+
+///|
 pub struct Tensor {
   data : Array[Double] // 扁平化存储
   shape : Array[Int] // 各维度大小
   strides : Array[Int] // 步长
   size : Int // 总元素数
+  dtype : DType // 元数据类型
+  device : Device // 设备类型
 }
 
 ///|
 /// 构造函数
 pub fn Tensor::new(data : Array[Double], shape : Array[Int]) -> Tensor {
+  Tensor::new_with_meta(data, shape, Float64, CPU)
+}
+
+///|
+pub fn Tensor::new_with_meta(
+  data : Array[Double],
+  shape : Array[Int],
+  dtype : DType,
+  device : Device,
+) -> Tensor {
   // 计算总大小
   let mut total_size = 1
   for i = 0; i < shape.length(); i = i + 1 {
@@ -30,7 +97,7 @@ pub fn Tensor::new(data : Array[Double], shape : Array[Int]) -> Tensor {
     strides[i] = stride
     stride = stride * shape[i]
   }
-  { data, shape, strides, size: total_size }
+  { data, shape, strides, size: total_size, dtype, device }
 }
 
 ///|
@@ -58,6 +125,38 @@ pub fn Tensor::fill(shape : Array[Int], value : Double) -> Tensor {
     size = size * shape[i]
   }
   Tensor::new(Array::make(size, value), shape)
+}
+
+///|
+pub fn Tensor::zeros_with_meta(
+  shape : Array[Int],
+  dtype : DType,
+  device : Device,
+) -> Tensor {
+  Tensor::fill_with_meta(shape, 0.0, dtype, device)
+}
+
+///|
+pub fn Tensor::ones_with_meta(
+  shape : Array[Int],
+  dtype : DType,
+  device : Device,
+) -> Tensor {
+  Tensor::fill_with_meta(shape, 1.0, dtype, device)
+}
+
+///|
+pub fn Tensor::fill_with_meta(
+  shape : Array[Int],
+  value : Double,
+  dtype : DType,
+  device : Device,
+) -> Tensor {
+  let mut size = 1
+  for i = 0; i < shape.length(); i = i + 1 {
+    size = size * shape[i]
+  }
+  Tensor::new_with_meta(Array::make(size, value), shape, dtype, device)
 }
 
 ///|
@@ -96,6 +195,35 @@ pub fn Tensor::total_size(self : Tensor) -> Int {
 }
 
 ///|
+pub fn Tensor::get_dtype(self : Tensor) -> DType {
+  self.dtype
+}
+
+///|
+pub fn Tensor::get_device(self : Tensor) -> Device {
+  self.device
+}
+
+///|
+pub fn Tensor::with_dtype(self : Tensor, dtype : DType) -> Tensor {
+  Tensor::new_with_meta(self.data, self.shape, dtype, self.device)
+}
+
+///|
+pub fn Tensor::with_device(self : Tensor, device : Device) -> Tensor {
+  Tensor::new_with_meta(self.data, self.shape, self.dtype, device)
+}
+
+///|
+pub fn Tensor::to_device(self : Tensor, device : Device) -> Tensor {
+  match device {
+    GPU => abort("GPU 暂未实现")
+    CPU => ()
+  }
+  self.with_device(device)
+}
+
+///|
 /// 计算多维索引对应的扁平化索引
 fn Tensor::compute_flat_index(self : Tensor, indices : Array[Int]) -> Int {
   if indices.length() != self.shape.length() {
@@ -128,6 +256,7 @@ pub fn Tensor::set(self : Tensor, indices : Array[Int], value : Double) -> Unit 
 ///|
 /// 张量加法
 pub fn Tensor::op_add(self : Tensor, other : Tensor) -> Tensor {
+  self.assert_compatible(other)
   let out_shape = broadcast_shape(self.shape, other.shape)
   let out_strides = compute_strides_for_shape(out_shape)
   let mut out_size = 1
@@ -151,12 +280,13 @@ pub fn Tensor::op_add(self : Tensor, other : Tensor) -> Tensor {
     )
     result_data[i] = self.data[idx_a] + other.data[idx_b]
   }
-  Tensor::new(result_data, out_shape)
+  Tensor::new_with_meta(result_data, out_shape, self.dtype, self.device)
 }
 
 ///|
 /// 张量减法
 pub fn Tensor::op_sub(self : Tensor, other : Tensor) -> Tensor {
+  self.assert_compatible(other)
   let out_shape = broadcast_shape(self.shape, other.shape)
   let out_strides = compute_strides_for_shape(out_shape)
   let mut out_size = 1
@@ -180,12 +310,13 @@ pub fn Tensor::op_sub(self : Tensor, other : Tensor) -> Tensor {
     )
     result_data[i] = self.data[idx_a] - other.data[idx_b]
   }
-  Tensor::new(result_data, out_shape)
+  Tensor::new_with_meta(result_data, out_shape, self.dtype, self.device)
 }
 
 ///|
 /// 张量除法
 pub fn Tensor::op_div(self : Tensor, other : Tensor) -> Tensor {
+  self.assert_compatible(other)
   let out_shape = broadcast_shape(self.shape, other.shape)
   let out_strides = compute_strides_for_shape(out_shape)
   let mut out_size = 1
@@ -209,7 +340,7 @@ pub fn Tensor::op_div(self : Tensor, other : Tensor) -> Tensor {
     )
     result_data[i] = self.data[idx_a] / other.data[idx_b]
   }
-  Tensor::new(result_data, out_shape)
+  Tensor::new_with_meta(result_data, out_shape, self.dtype, self.device)
 }
 
 ///|
@@ -219,12 +350,13 @@ pub fn Tensor::scalar_mul(self : Tensor, scalar : Double) -> Tensor {
   for i = 0; i < self.size; i = i + 1 {
     result_data[i] = self.data[i] * scalar
   }
-  Tensor::new(result_data, self.shape)
+  Tensor::new_with_meta(result_data, self.shape, self.dtype, self.device)
 }
 
 ///|
 /// 元素级乘法 (Hadamard product) - 用于 * 运算符
 pub fn Tensor::op_mul(self : Tensor, other : Tensor) -> Tensor {
+  self.assert_compatible(other)
   let out_shape = broadcast_shape(self.shape, other.shape)
   let out_strides = compute_strides_for_shape(out_shape)
   let mut out_size = 1
@@ -248,7 +380,7 @@ pub fn Tensor::op_mul(self : Tensor, other : Tensor) -> Tensor {
     )
     result_data[i] = self.data[idx_a] * other.data[idx_b]
   }
-  Tensor::new(result_data, out_shape)
+  Tensor::new_with_meta(result_data, out_shape, self.dtype, self.device)
 }
 
 ///|
@@ -322,7 +454,7 @@ pub fn Tensor::reshape(self : Tensor, new_shape : Array[Int]) -> Tensor {
   for i = 0; i < self.size; i = i + 1 {
     new_data[i] = self.data[i]
   }
-  Tensor::new(new_data, final_shape)
+  Tensor::new_with_meta(new_data, final_shape, self.dtype, self.device)
 }
 
 ///|
@@ -373,7 +505,7 @@ pub fn Tensor::transpose(self : Tensor, axes? : Array[Int] = []) -> Tensor {
     }
     new_data[new_idx] = self.data[i]
   }
-  Tensor::new(new_data, new_shape)
+  Tensor::new_with_meta(new_data, new_shape, self.dtype, self.device)
 }
 
 ///|
@@ -415,7 +547,7 @@ pub fn Tensor::slice(
     }
     new_data[idx] = self.data[in_idx]
   }
-  Tensor::new(new_data, new_shape)
+  Tensor::new_with_meta(new_data, new_shape, self.dtype, self.device)
 }
 
 ///|
@@ -433,6 +565,9 @@ pub fn Tensor::concat(axis : Int, tensors : Array[Tensor]) -> Tensor {
     let t = tensors[i]
     if t.ndim() != ref0.ndim() {
       abort("张量维度不一致")
+    }
+    if not(ref0.meta_compatible(t)) {
+      abort("张量 dtype 或 device 不一致")
     }
     for d = 0; d < ref0.ndim(); d = d + 1 {
       if d != axis && t.shape[d] != ref0.shape[d] {
@@ -465,7 +600,7 @@ pub fn Tensor::concat(axis : Int, tensors : Array[Tensor]) -> Tensor {
     }
     offset = offset + t.shape[axis]
   }
-  Tensor::new(new_data, new_shape)
+  Tensor::new_with_meta(new_data, new_shape, ref0.dtype, ref0.device)
 }
 
 ///|
@@ -482,6 +617,9 @@ pub fn Tensor::stack(axis : Int, tensors : Array[Tensor]) -> Tensor {
     let t = tensors[i]
     if t.ndim() != ref0.ndim() {
       abort("张量维度不一致")
+    }
+    if not(ref0.meta_compatible(t)) {
+      abort("张量 dtype 或 device 不一致")
     }
     if not(ref0.shapes_equal(t)) {
       abort("张量形状不匹配")
@@ -524,7 +662,7 @@ pub fn Tensor::stack(axis : Int, tensors : Array[Tensor]) -> Tensor {
       new_data[new_idx] = t.data[idx]
     }
   }
-  Tensor::new(new_data, new_shape)
+  Tensor::new_with_meta(new_data, new_shape, ref0.dtype, ref0.device)
 }
 
 ///|
@@ -534,7 +672,7 @@ pub fn Tensor::flatten(self : Tensor) -> Tensor {
   for i = 0; i < self.size; i = i + 1 {
     new_data[i] = self.data[i]
   }
-  Tensor::new(new_data, [self.size])
+  Tensor::new_with_meta(new_data, [self.size], self.dtype, self.device)
 }
 
 ///|
@@ -572,7 +710,7 @@ pub fn Tensor::sum_axes(
     reduce_mask[ax] = true
   }
   if not(keepdim) && axes.length() == ndim {
-    return Tensor::new([self.sum()], [1])
+    return Tensor::new_with_meta([self.sum()], [1], self.dtype, self.device)
   }
   let out_shape = if keepdim {
     let s = Array::make(ndim, 0)
@@ -622,7 +760,7 @@ pub fn Tensor::sum_axes(
     }
     result_data[out_idx] = result_data[out_idx] + self.data[i]
   }
-  Tensor::new(result_data, out_shape)
+  Tensor::new_with_meta(result_data, out_shape, self.dtype, self.device)
 }
 
 ///|
@@ -715,6 +853,18 @@ fn Tensor::shapes_equal(self : Tensor, other : Tensor) -> Bool {
 }
 
 ///|
+fn Tensor::meta_compatible(self : Tensor, other : Tensor) -> Bool {
+  dtype_eq(self.dtype, other.dtype) && device_eq(self.device, other.device)
+}
+
+///|
+fn Tensor::assert_compatible(self : Tensor, other : Tensor) -> Unit {
+  if not(self.meta_compatible(other)) {
+    abort("张量 dtype 或 device 不一致")
+  }
+}
+
+///|
 /// 计算广播后的形状
 fn broadcast_shape(a_shape : Array[Int], b_shape : Array[Int]) -> Array[Int] {
   let a_len = a_shape.length()
@@ -790,7 +940,7 @@ pub fn Tensor::copy(self : Tensor) -> Tensor {
   for i = 0; i < self.size; i = i + 1 {
     new_data[i] = self.data[i]
   }
-  Tensor::new(new_data, self.shape)
+  Tensor::new_with_meta(new_data, self.shape, self.dtype, self.device)
 }
 
 ///|
@@ -800,7 +950,7 @@ pub fn Tensor::map(self : Tensor, f : (Double) -> Double) -> Tensor {
   for i = 0; i < self.size; i = i + 1 {
     result_data[i] = f(self.data[i])
   }
-  Tensor::new(result_data, self.shape)
+  Tensor::new_with_meta(result_data, self.shape, self.dtype, self.device)
 }
 
 ///|
@@ -841,7 +991,9 @@ pub fn Tensor::to_string(self : Tensor) -> String {
       str = str + ", "
     }
   }
-  str = str + "], data=[..."
+  str = str + "], dtype=" + self.dtype.to_string()
+  str = str + ", device=" + self.device.to_string()
+  str = str + ", data=[..."
 
   // 只显示前几个元素
   let display_count = if self.size < 10 { self.size } else { 10 }
