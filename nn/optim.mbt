@@ -348,6 +348,352 @@ pub fn step_decay(
 }
 
 ///|
+fn tensor_numel(t : @math.Tensor) -> Int {
+  let shape = t.get_shape()
+  let mut total = 1
+  for i = 0; i < shape.length(); i = i + 1 {
+    total = total * shape[i]
+  }
+  total
+}
+
+///|
+fn optim_compute_strides(shape : Array[Int]) -> Array[Int] {
+  let strides = Array::make(shape.length(), 0)
+  let mut stride = 1
+  for i = shape.length() - 1; i >= 0; i = i - 1 {
+    strides[i] = stride
+    stride = stride * shape[i]
+  }
+  strides
+}
+
+///|
+fn optim_indices_from_flat(
+  shape : Array[Int],
+  strides : Array[Int],
+  idx : Int,
+) -> Array[Int] {
+  let coords = Array::make(shape.length(), 0)
+  let mut remain = idx
+  for i = 0; i < shape.length(); i = i + 1 {
+    coords[i] = remain / strides[i]
+    remain = remain % strides[i]
+  }
+  coords
+}
+
+///|
+pub struct SGDParams {
+  lr : Double
+  momentum : Double
+  weight_decay : Double
+  velocities : Array[Array[Double]]
+}
+
+///|
+pub fn SGDParams::new(
+  lr : Double,
+  params : Array[Parameter],
+  momentum? : Double = 0.0,
+  weight_decay? : Double = 0.0,
+) -> SGDParams {
+  if lr <= 0.0 {
+    abort("lr 必须大于 0")
+  }
+  if momentum < 0.0 {
+    abort("momentum 不能为负")
+  }
+  if weight_decay < 0.0 {
+    abort("weight_decay 不能为负")
+  }
+  let velocities = Array::make(params.length(), [])
+  for i = 0; i < params.length(); i = i + 1 {
+    let total = tensor_numel(params[i].get_data())
+    velocities[i] = Array::make(total, 0.0)
+  }
+  { lr, momentum, weight_decay, velocities }
+}
+
+///|
+pub fn SGDParams::step(self : SGDParams, params : Array[Parameter]) -> Unit {
+  if params.length() != self.velocities.length() {
+    abort("参数数量不匹配")
+  }
+  for i = 0; i < params.length(); i = i + 1 {
+    let data = params[i].get_data()
+    let grad = params[i].get_grad()
+    let shape = data.get_shape()
+    if shape != grad.get_shape() {
+      abort("data/grad 形状不一致")
+    }
+    let total = tensor_numel(data)
+    if self.velocities[i].length() != total {
+      abort("velocity 尺寸不匹配")
+    }
+    let strides = optim_compute_strides(shape)
+    for idx = 0; idx < total; idx = idx + 1 {
+      let coord = optim_indices_from_flat(shape, strides, idx)
+      let g = grad.get(coord) + self.weight_decay * data.get(coord)
+      let v = self.momentum * self.velocities[i][idx] - self.lr * g
+      self.velocities[i][idx] = v
+      data.set(coord, data.get(coord) + v)
+    }
+    params[i].set_data_inplace(data)
+  }
+}
+
+///|
+pub struct AdamParams {
+  lr : Double
+  beta1 : Double
+  beta2 : Double
+  eps : Double
+  m : Array[Array[Double]]
+  v : Array[Array[Double]]
+  mut t : Int
+}
+
+///|
+pub fn AdamParams::new(
+  lr : Double,
+  params : Array[Parameter],
+  beta1? : Double = 0.9,
+  beta2? : Double = 0.999,
+  eps? : Double = 1.0e-8,
+) -> AdamParams {
+  if lr <= 0.0 {
+    abort("lr 必须大于 0")
+  }
+  let m = Array::make(params.length(), [])
+  let v = Array::make(params.length(), [])
+  for i = 0; i < params.length(); i = i + 1 {
+    let total = tensor_numel(params[i].get_data())
+    m[i] = Array::make(total, 0.0)
+    v[i] = Array::make(total, 0.0)
+  }
+  { lr, beta1, beta2, eps, m, v, t: 0 }
+}
+
+///|
+pub fn AdamParams::step(self : AdamParams, params : Array[Parameter]) -> Unit {
+  if params.length() != self.m.length() {
+    abort("参数数量不匹配")
+  }
+  self.t = self.t + 1
+  let t_hat = self.t.to_double()
+  for i = 0; i < params.length(); i = i + 1 {
+    let data = params[i].get_data()
+    let grad = params[i].get_grad()
+    let shape = data.get_shape()
+    if shape != grad.get_shape() {
+      abort("data/grad 形状不一致")
+    }
+    let total = tensor_numel(data)
+    let strides = optim_compute_strides(shape)
+    for idx = 0; idx < total; idx = idx + 1 {
+      let coord = optim_indices_from_flat(shape, strides, idx)
+      let g = grad.get(coord)
+      self.m[i][idx] = self.beta1 * self.m[i][idx] + (1.0 - self.beta1) * g
+      self.v[i][idx] = self.beta2 * self.v[i][idx] + (1.0 - self.beta2) * g * g
+      let m_hat = self.m[i][idx] /
+        (1.0 - @moonbitlang/core/math.pow(self.beta1, t_hat))
+      let v_hat = self.v[i][idx] /
+        (1.0 - @moonbitlang/core/math.pow(self.beta2, t_hat))
+      data.set(
+        coord,
+        data.get(coord) -
+        self.lr * m_hat / (@moonbitlang/core/math.pow(v_hat, 0.5) + self.eps),
+      )
+    }
+    params[i].set_data_inplace(data)
+  }
+}
+
+///|
+pub struct AdamWParams {
+  lr : Double
+  beta1 : Double
+  beta2 : Double
+  eps : Double
+  weight_decay : Double
+  m : Array[Array[Double]]
+  v : Array[Array[Double]]
+  mut t : Int
+}
+
+///|
+pub fn AdamWParams::new(
+  lr : Double,
+  params : Array[Parameter],
+  beta1? : Double = 0.9,
+  beta2? : Double = 0.999,
+  eps? : Double = 1.0e-8,
+  weight_decay? : Double = 0.0,
+) -> AdamWParams {
+  if lr <= 0.0 {
+    abort("lr 必须大于 0")
+  }
+  if weight_decay < 0.0 {
+    abort("weight_decay 不能为负")
+  }
+  let m = Array::make(params.length(), [])
+  let v = Array::make(params.length(), [])
+  for i = 0; i < params.length(); i = i + 1 {
+    let total = tensor_numel(params[i].get_data())
+    m[i] = Array::make(total, 0.0)
+    v[i] = Array::make(total, 0.0)
+  }
+  { lr, beta1, beta2, eps, weight_decay, m, v, t: 0 }
+}
+
+///|
+pub fn AdamWParams::step(self : AdamWParams, params : Array[Parameter]) -> Unit {
+  if params.length() != self.m.length() {
+    abort("参数数量不匹配")
+  }
+  self.t = self.t + 1
+  let t_hat = self.t.to_double()
+  for i = 0; i < params.length(); i = i + 1 {
+    let data = params[i].get_data()
+    let grad = params[i].get_grad()
+    let shape = data.get_shape()
+    if shape != grad.get_shape() {
+      abort("data/grad 形状不一致")
+    }
+    let total = tensor_numel(data)
+    let strides = optim_compute_strides(shape)
+    for idx = 0; idx < total; idx = idx + 1 {
+      let coord = optim_indices_from_flat(shape, strides, idx)
+      let g = grad.get(coord)
+      self.m[i][idx] = self.beta1 * self.m[i][idx] + (1.0 - self.beta1) * g
+      self.v[i][idx] = self.beta2 * self.v[i][idx] + (1.0 - self.beta2) * g * g
+      let m_hat = self.m[i][idx] /
+        (1.0 - @moonbitlang/core/math.pow(self.beta1, t_hat))
+      let v_hat = self.v[i][idx] /
+        (1.0 - @moonbitlang/core/math.pow(self.beta2, t_hat))
+      let update = m_hat / (@moonbitlang/core/math.pow(v_hat, 0.5) + self.eps)
+      data.set(
+        coord,
+        data.get(coord) -
+        self.lr * update -
+        self.lr * self.weight_decay * data.get(coord),
+      )
+    }
+    params[i].set_data_inplace(data)
+  }
+}
+
+///|
+pub struct RMSPropParams {
+  lr : Double
+  alpha : Double
+  eps : Double
+  v : Array[Array[Double]]
+}
+
+///|
+pub fn RMSPropParams::new(
+  lr : Double,
+  params : Array[Parameter],
+  alpha? : Double = 0.99,
+  eps? : Double = 1.0e-8,
+) -> RMSPropParams {
+  if lr <= 0.0 {
+    abort("lr 必须大于 0")
+  }
+  if alpha <= 0.0 || alpha >= 1.0 {
+    abort("alpha 必须在 (0, 1) 之间")
+  }
+  let v = Array::make(params.length(), [])
+  for i = 0; i < params.length(); i = i + 1 {
+    let total = tensor_numel(params[i].get_data())
+    v[i] = Array::make(total, 0.0)
+  }
+  { lr, alpha, eps, v }
+}
+
+///|
+pub fn RMSPropParams::step(
+  self : RMSPropParams,
+  params : Array[Parameter],
+) -> Unit {
+  if params.length() != self.v.length() {
+    abort("参数数量不匹配")
+  }
+  for i = 0; i < params.length(); i = i + 1 {
+    let data = params[i].get_data()
+    let grad = params[i].get_grad()
+    let shape = data.get_shape()
+    if shape != grad.get_shape() {
+      abort("data/grad 形状不一致")
+    }
+    let total = tensor_numel(data)
+    let strides = optim_compute_strides(shape)
+    for idx = 0; idx < total; idx = idx + 1 {
+      let coord = optim_indices_from_flat(shape, strides, idx)
+      let g = grad.get(coord)
+      self.v[i][idx] = self.alpha * self.v[i][idx] + (1.0 - self.alpha) * g * g
+      let denom = @moonbitlang/core/math.pow(self.v[i][idx], 0.5) + self.eps
+      data.set(coord, data.get(coord) - self.lr * g / denom)
+    }
+    params[i].set_data_inplace(data)
+  }
+}
+
+///|
+pub struct AdagradParams {
+  lr : Double
+  eps : Double
+  h : Array[Array[Double]]
+}
+
+///|
+pub fn AdagradParams::new(
+  lr : Double,
+  params : Array[Parameter],
+  eps? : Double = 1.0e-8,
+) -> AdagradParams {
+  if lr <= 0.0 {
+    abort("lr 必须大于 0")
+  }
+  let h = Array::make(params.length(), [])
+  for i = 0; i < params.length(); i = i + 1 {
+    let total = tensor_numel(params[i].get_data())
+    h[i] = Array::make(total, 0.0)
+  }
+  { lr, eps, h }
+}
+
+///|
+pub fn AdagradParams::step(
+  self : AdagradParams,
+  params : Array[Parameter],
+) -> Unit {
+  if params.length() != self.h.length() {
+    abort("参数数量不匹配")
+  }
+  for i = 0; i < params.length(); i = i + 1 {
+    let data = params[i].get_data()
+    let grad = params[i].get_grad()
+    let shape = data.get_shape()
+    if shape != grad.get_shape() {
+      abort("data/grad 形状不一致")
+    }
+    let total = tensor_numel(data)
+    let strides = optim_compute_strides(shape)
+    for idx = 0; idx < total; idx = idx + 1 {
+      let coord = optim_indices_from_flat(shape, strides, idx)
+      let g = grad.get(coord)
+      self.h[i][idx] = self.h[i][idx] + g * g
+      let denom = @moonbitlang/core/math.pow(self.h[i][idx], 0.5) + self.eps
+      data.set(coord, data.get(coord) - self.lr * g / denom)
+    }
+    params[i].set_data_inplace(data)
+  }
+}
+
+///|
 /// 余弦学习率衰减
 pub fn cosine_decay(
   lr : Double,
