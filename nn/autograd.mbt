@@ -1807,15 +1807,23 @@ pub fn ComputationGraph::backward_with_grad(
         let g = node.grad
         let p0 = node.parents[0]
         let p1 = node.parents[1]
-        tensor_add_inplace(self.nodes[p0].grad, g)
-        tensor_add_inplace(self.nodes[p1].grad, g)
+        let shape0 = self.nodes[p0].value.get_shape()
+        let shape1 = self.nodes[p1].value.get_shape()
+        let grad0 = tensor_reduce_to_shape(g, shape0)
+        let grad1 = tensor_reduce_to_shape(g, shape1)
+        tensor_add_inplace(self.nodes[p0].grad, grad0)
+        tensor_add_inplace(self.nodes[p1].grad, grad1)
       }
       Sub => {
         let g = node.grad
         let p0 = node.parents[0]
         let p1 = node.parents[1]
-        tensor_add_inplace(self.nodes[p0].grad, g)
-        tensor_add_inplace(self.nodes[p1].grad, tensor_neg(g))
+        let shape0 = self.nodes[p0].value.get_shape()
+        let shape1 = self.nodes[p1].value.get_shape()
+        let grad0 = tensor_reduce_to_shape(g, shape0)
+        let grad1 = tensor_reduce_to_shape(tensor_neg(g), shape1)
+        tensor_add_inplace(self.nodes[p0].grad, grad0)
+        tensor_add_inplace(self.nodes[p1].grad, grad1)
       }
       Mul => {
         let g = node.grad
@@ -1823,8 +1831,12 @@ pub fn ComputationGraph::backward_with_grad(
         let p1 = node.parents[1]
         let v0 = self.nodes[p0].value
         let v1 = self.nodes[p1].value
-        let grad0 = tensor_hadamard(g, v1)
-        let grad1 = tensor_hadamard(g, v0)
+        let grad0_full = tensor_mul(g, v1)
+        let grad1_full = tensor_mul(g, v0)
+        let shape0 = v0.get_shape()
+        let shape1 = v1.get_shape()
+        let grad0 = tensor_reduce_to_shape(grad0_full, shape0)
+        let grad1 = tensor_reduce_to_shape(grad1_full, shape1)
         tensor_add_inplace(self.nodes[p0].grad, grad0)
         tensor_add_inplace(self.nodes[p1].grad, grad1)
       }
