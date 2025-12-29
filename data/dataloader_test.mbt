@@ -88,3 +88,22 @@ test "multidataloader basic batch" {
     None => abort("no batch")
   }
 }
+
+///|
+test "dataloader batch pack" {
+  let features = [[1.0], [2.0]]
+  let labels = [0.0, 1.0]
+  let ds = Dataset::new(features, labels)
+  let loader = DataLoader::new(ds, batch_size=2, shuffle=false)
+  match loader.next_batch_pack() {
+    Some(batch) =>
+      match batch.labels {
+        Single(ls) => {
+          assert_eq(batch.features.length(), 2)
+          assert_eq(ls.length(), 2)
+        }
+        Multi(_) => abort("unexpected multi labels")
+      }
+    None => abort("no batch")
+  }
+}
