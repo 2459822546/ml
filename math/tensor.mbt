@@ -371,6 +371,75 @@ fn Tensor::shapes_equal(self : Tensor, other : Tensor) -> Bool {
 }
 
 ///|
+/// 计算广播后的形状
+fn broadcast_shape(a_shape : Array[Int], b_shape : Array[Int]) -> Array[Int] {
+  let a_len = a_shape.length()
+  let b_len = b_shape.length()
+  let out_len = if a_len > b_len { a_len } else { b_len }
+  let out_shape = Array::make(out_len, 0)
+  for i = 0; i < out_len; i = i + 1 {
+    let a_i = i + a_len - out_len
+    let b_i = i + b_len - out_len
+    let a_dim = if a_i >= 0 { a_shape[a_i] } else { 1 }
+    let b_dim = if b_i >= 0 { b_shape[b_i] } else { 1 }
+    if a_dim == b_dim || a_dim == 1 || b_dim == 1 {
+      out_shape[i] = if a_dim > b_dim { a_dim } else { b_dim }
+    } else {
+      abort("张量形状不匹配")
+    }
+  }
+  out_shape
+}
+
+///|
+/// 广播索引映射
+fn broadcast_index(
+  out_indices : Array[Int],
+  out_shape : Array[Int],
+  in_shape : Array[Int],
+  in_strides : Array[Int],
+) -> Int {
+  let out_len = out_shape.length()
+  let in_len = in_shape.length()
+  let offset = out_len - in_len
+  let mut idx = 0
+  for i = 0; i < in_len; i = i + 1 {
+    let out_i = i + offset
+    let v = if in_shape[i] == 1 { 0 } else { out_indices[out_i] }
+    idx = idx + v * in_strides[i]
+  }
+  idx
+}
+
+///|
+/// 计算形状对应的步长
+fn compute_strides_for_shape(shape : Array[Int]) -> Array[Int] {
+  let strides = Array::make(shape.length(), 0)
+  let mut stride = 1
+  for i = shape.length() - 1; i >= 0; i = i - 1 {
+    strides[i] = stride
+    stride = stride * shape[i]
+  }
+  strides
+}
+
+///|
+/// 由扁平索引反推出多维索引
+fn indices_from_flat(
+  shape : Array[Int],
+  strides : Array[Int],
+  idx : Int,
+) -> Array[Int] {
+  let coords = Array::make(shape.length(), 0)
+  let mut remain = idx
+  for i = 0; i < shape.length(); i = i + 1 {
+    coords[i] = remain / strides[i]
+    remain = remain % strides[i]
+  }
+  coords
+}
+
+///|
 /// 复制张量
 pub fn Tensor::copy(self : Tensor) -> Tensor {
   let new_data = Array::make(self.size, 0.0)
