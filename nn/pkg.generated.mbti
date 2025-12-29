@@ -20,6 +20,8 @@ fn activation_forward_tensor(@math.Tensor, Activation) -> @math.Tensor
 
 fn binary_cross_entropy(Array[Double], Array[Double], eps? : Double) -> Double
 
+fn cosine_decay(Double, Double, Int, Int) -> Double
+
 fn cross_entropy(Array[Int], @math.Matrix) -> Double
 
 fn huber_loss(Array[Double], Array[Double], delta? : Double) -> Double
@@ -30,9 +32,29 @@ fn l2_penalty(Array[Double], Double) -> Double
 
 fn linear_rand_init(Int, Int, scale? : Double, seed? : Int) -> Linear
 
+fn linear_warmup(Double, Int, Int) -> Double
+
 fn mse_loss(Array[Double], Array[Double]) -> Double
 
+fn optimizer_adagrad(Adagrad) -> Optimizer
+
+fn optimizer_adam(Adam) -> Optimizer
+
+fn optimizer_adamw(AdamW) -> Optimizer
+
+fn optimizer_get_lr(Optimizer) -> Double
+
+fn optimizer_rmsprop(RMSProp) -> Optimizer
+
+fn optimizer_set_lr(Optimizer, Double) -> Optimizer
+
+fn optimizer_sgd(SGD) -> Optimizer
+
+fn optimizer_step(Optimizer, OptimParam) -> Optimizer
+
 fn step_decay(Double, Double, Int, Int) -> Double
+
+fn warmup_cosine(Double, Double, Int, Int, Int) -> Double
 
 // Errors
 
@@ -44,8 +66,18 @@ pub enum Activation {
   Softmax
 }
 
+pub struct Adagrad {
+  mut lr : Double
+  eps : Double
+  h : Array[Double]
+}
+fn Adagrad::get_lr(Self) -> Double
+fn Adagrad::new(Double, Int, eps? : Double) -> Self
+fn Adagrad::set_lr(Self, Double) -> Unit
+fn Adagrad::step(Self, OptimParam) -> Unit
+
 pub struct Adam {
-  lr : Double
+  mut lr : Double
   beta1 : Double
   beta2 : Double
   eps : Double
@@ -53,8 +85,25 @@ pub struct Adam {
   v : Array[Double]
   mut t : Int
 }
+fn Adam::get_lr(Self) -> Double
 fn Adam::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double) -> Self
+fn Adam::set_lr(Self, Double) -> Unit
 fn Adam::step(Self, OptimParam) -> Unit
+
+pub struct AdamW {
+  mut lr : Double
+  beta1 : Double
+  beta2 : Double
+  eps : Double
+  weight_decay : Double
+  m : Array[Double]
+  v : Array[Double]
+  mut t : Int
+}
+fn AdamW::get_lr(Self) -> Double
+fn AdamW::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double, weight_decay? : Double) -> Self
+fn AdamW::set_lr(Self, Double) -> Unit
+fn AdamW::step(Self, OptimParam) -> Unit
 
 pub struct ComputationGraph {
   nodes : Array[Node]
@@ -120,12 +169,34 @@ fn OptimParam::new(Array[Double]) -> Self
 fn OptimParam::with_grad(Self, Array[Double]) -> Self
 fn OptimParam::zero_grad(Self) -> Unit
 
+pub enum Optimizer {
+  SGD(SGD)
+  Adam(Adam)
+  AdamW(AdamW)
+  RMSProp(RMSProp)
+  Adagrad(Adagrad)
+}
+
+pub struct RMSProp {
+  mut lr : Double
+  alpha : Double
+  eps : Double
+  v : Array[Double]
+}
+fn RMSProp::get_lr(Self) -> Double
+fn RMSProp::new(Double, Int, alpha? : Double, eps? : Double) -> Self
+fn RMSProp::set_lr(Self, Double) -> Unit
+fn RMSProp::step(Self, OptimParam) -> Unit
+
 pub struct SGD {
-  lr : Double
+  mut lr : Double
   momentum : Double
+  weight_decay : Double
   velocity : Array[Double]
 }
-fn SGD::new(Double, Int, momentum? : Double) -> Self
+fn SGD::get_lr(Self) -> Double
+fn SGD::new(Double, Int, momentum? : Double, weight_decay? : Double) -> Self
+fn SGD::set_lr(Self, Double) -> Unit
 fn SGD::step(Self, OptimParam) -> Unit
 
 // Type aliases
