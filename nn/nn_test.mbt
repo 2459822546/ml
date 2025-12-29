@@ -96,6 +96,49 @@ test "modulelist nested parameters" {
 }
 
 ///|
+test "batchnorm layernorm parameter grads" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let bn = BatchNorm1dModule::new(2)
+  let (y, ctx) = bn.forward(x, train=true)
+  let loss = y.sum()
+  loss.backward()
+  bn.sync_grads(ctx)
+  let bn_params = bn.parameters()
+  let bn_gamma_grad = bn_params[0].get_grad()
+  let bn_beta_grad = bn_params[1].get_grad()
+  assert_true(bn_gamma_grad.get([0]).abs() < 1.0e-6)
+  assert_true((bn_beta_grad.get([0]) - 2.0).abs() < 1.0e-6)
+  let ln = LayerNormModule::new(2)
+  let (y2, ctx2) = ln.forward(x)
+  let loss2 = y2.sum()
+  loss2.backward()
+  ln.sync_grads(ctx2)
+  let ln_params = ln.parameters()
+  let ln_gamma_grad = ln_params[0].get_grad()
+  let ln_beta_grad = ln_params[1].get_grad()
+  assert_true((ln_gamma_grad.get([0]) + 2.0).abs() < 1.0e-4)
+  assert_true((ln_gamma_grad.get([1]) - 2.0).abs() < 1.0e-4)
+  assert_true((ln_beta_grad.get([0]) - 2.0).abs() < 1.0e-6)
+}
+
+///|
+test "embedding module grads" {
+  let emb = EmbeddingModule::new(3, 2, seed=1)
+  let x = AutoTensor::new(@math.Tensor::new([0.0, 2.0], [2]))
+  let (y, ctx) = emb.forward(x)
+  let loss = y.sum()
+  loss.backward()
+  emb.sync_grads(ctx)
+  let grad = emb.parameters()[0].get_grad()
+  assert_true((grad.get([0, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((grad.get([0, 1]) - 1.0).abs() < 1.0e-9)
+  assert_true((grad.get([2, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((grad.get([2, 1]) - 1.0).abs() < 1.0e-9)
+  assert_eq(grad.get([1, 0]), 0.0)
+  assert_eq(grad.get([1, 1]), 0.0)
+}
+
+///|
 test "autotensor operators" {
   let a = AutoTensor::new(@math.Tensor::from_vector(@math.Vector::new([2.0])))
   let b = a.from_other(@math.Tensor::from_vector(@math.Vector::new([3.0])))

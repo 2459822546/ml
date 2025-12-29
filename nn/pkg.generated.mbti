@@ -229,6 +229,25 @@ fn BatchNorm1d::forward(Self, @math.Matrix, train? : Bool) -> @math.Matrix
 fn BatchNorm1d::forward_with_cache(Self, @math.Matrix, train? : Bool) -> (@math.Matrix, Array[Double], Array[Double])
 fn BatchNorm1d::new(Int, momentum? : Double, eps? : Double) -> Self
 
+pub struct BatchNorm1dContext {
+  gamma : AutoTensor
+  beta : AutoTensor
+}
+
+pub struct BatchNorm1dModule {
+  gamma : Parameter
+  beta : Parameter
+  running_mean : Array[Double]
+  running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+fn BatchNorm1dModule::forward(Self, AutoTensor, train? : Bool) -> (AutoTensor, BatchNorm1dContext)
+fn BatchNorm1dModule::from_layer(BatchNorm1d) -> Self
+fn BatchNorm1dModule::new(Int, momentum? : Double, eps? : Double) -> Self
+fn BatchNorm1dModule::parameters(Self) -> Array[Parameter]
+fn BatchNorm1dModule::sync_grads(Self, BatchNorm1dContext) -> Unit
+
 pub struct ComputationGraph {
   nodes : Array[Node]
 }
@@ -285,6 +304,21 @@ pub struct Embedding {
 fn Embedding::forward(Self, Array[Int]) -> @math.Matrix
 fn Embedding::new(Int, Int, seed? : Int) -> Self
 
+pub struct EmbeddingContext {
+  weight : AutoTensor
+}
+
+pub struct EmbeddingModule {
+  weight : Parameter
+  num_embeddings : Int
+  dim : Int
+}
+fn EmbeddingModule::forward(Self, AutoTensor) -> (AutoTensor, EmbeddingContext)
+fn EmbeddingModule::from_layer(Embedding) -> Self
+fn EmbeddingModule::new(Int, Int, seed? : Int) -> Self
+fn EmbeddingModule::parameters(Self) -> Array[Parameter]
+fn EmbeddingModule::sync_grads(Self, EmbeddingContext) -> Unit
+
 pub struct LayerNorm {
   gamma : Array[Double]
   beta : Array[Double]
@@ -292,6 +326,22 @@ pub struct LayerNorm {
 }
 fn LayerNorm::forward(Self, @math.Matrix) -> @math.Matrix
 fn LayerNorm::new(Int, eps? : Double) -> Self
+
+pub struct LayerNormContext {
+  gamma : AutoTensor
+  beta : AutoTensor
+}
+
+pub struct LayerNormModule {
+  gamma : Parameter
+  beta : Parameter
+  eps : Double
+}
+fn LayerNormModule::forward(Self, AutoTensor) -> (AutoTensor, LayerNormContext)
+fn LayerNormModule::from_layer(LayerNorm) -> Self
+fn LayerNormModule::new(Int, eps? : Double) -> Self
+fn LayerNormModule::parameters(Self) -> Array[Parameter]
+fn LayerNormModule::sync_grads(Self, LayerNormContext) -> Unit
 
 pub struct Linear {
   mut w : Array[Array[Double]]
@@ -340,9 +390,9 @@ pub enum Module {
   Linear(LinearModule)
   Relu
   Dropout(Dropout)
-  BatchNorm1d(BatchNorm1d)
-  LayerNorm(LayerNorm)
-  Embedding(Embedding)
+  BatchNorm1d(BatchNorm1dModule)
+  LayerNorm(LayerNormModule)
+  Embedding(EmbeddingModule)
   Sequential(Sequential)
   ModuleList(ModuleList)
 }
@@ -350,6 +400,9 @@ pub enum Module {
 pub enum ModuleContext {
   None
   Linear(LinearContext)
+  BatchNorm1d(BatchNorm1dContext)
+  LayerNorm(LayerNormContext)
+  Embedding(EmbeddingContext)
   Sequential(Array[ModuleContext])
 }
 

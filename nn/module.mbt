@@ -28,6 +28,61 @@ fn module_array_to_tensor(values : Array[Double]) -> @math.Tensor {
 }
 
 ///|
+fn module_batchnorm_stats(x : @math.Tensor) -> (Array[Double], Array[Double]) {
+  let shape = x.get_shape()
+  if shape.length() != 2 {
+    abort("batchnorm1d 仅支持 2D 张量")
+  }
+  let n = shape[0]
+  let m = shape[1]
+  let mean = Array::make(m, 0.0)
+  let variance = Array::make(m, 0.0)
+  for j = 0; j < m; j = j + 1 {
+    let mut sum = 0.0
+    for i = 0; i < n; i = i + 1 {
+      sum = sum + x.get([i, j])
+    }
+    mean[j] = sum / n.to_double()
+  }
+  for j = 0; j < m; j = j + 1 {
+    let mut sum = 0.0
+    for i = 0; i < n; i = i + 1 {
+      let diff = x.get([i, j]) - mean[j]
+      sum = sum + diff * diff
+    }
+    variance[j] = sum / n.to_double()
+  }
+  (mean, variance)
+}
+
+///|
+fn module_batchnorm_forward_tensor(
+  x : @math.Tensor,
+  gamma : @math.Tensor,
+  beta : @math.Tensor,
+  mean : Array[Double],
+  variance : Array[Double],
+  eps : Double,
+) -> @math.Tensor {
+  let shape = x.get_shape()
+  if shape.length() != 2 {
+    abort("batchnorm1d 仅支持 2D 张量")
+  }
+  let n = shape[0]
+  let m = shape[1]
+  let data = Array::make(n * m, 0.0)
+  let mut idx = 0
+  for i = 0; i < n; i = i + 1 {
+    for j = 0; j < m; j = j + 1 {
+      let norm = (x.get([i, j]) - mean[j]) / (variance[j] + eps).sqrt()
+      data[idx] = norm * gamma.get([j]) + beta.get([j])
+      idx = idx + 1
+    }
+  }
+  @math.Tensor::new(data, [n, m])
+}
+
+///|
 pub fn Parameter::new(
   data : @math.Tensor,
   requires_grad? : Bool = true,
@@ -169,13 +224,254 @@ pub fn LinearModule::parameters(self : LinearModule) -> Array[Parameter] {
 }
 
 ///|
+pub struct BatchNorm1dModule {
+  gamma : Parameter
+  beta : Parameter
+  running_mean : Array[Double]
+  running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+
+///|
+pub fn BatchNorm1dModule::new(
+  num_features : Int,
+  momentum? : Double = 0.9,
+  eps? : Double = 1.0e-5,
+) -> BatchNorm1dModule {
+  if num_features <= 0 {
+    abort("num_features 必须大于 0")
+  }
+  let gamma = Parameter::new(
+    @math.Tensor::new(Array::make(num_features, 1.0), [num_features]),
+  )
+  let beta = Parameter::new(
+    @math.Tensor::new(Array::make(num_features, 0.0), [num_features]),
+  )
+  let running_mean = Array::make(num_features, 0.0)
+  let running_var = Array::make(num_features, 1.0)
+  { gamma, beta, running_mean, running_var, momentum, eps }
+}
+
+///|
+pub fn BatchNorm1dModule::from_layer(bn : BatchNorm1d) -> BatchNorm1dModule {
+  let gamma = Parameter::new(module_array_to_tensor(bn.gamma))
+  let beta = Parameter::new(module_array_to_tensor(bn.beta))
+  {
+    gamma,
+    beta,
+    running_mean: bn.running_mean,
+    running_var: bn.running_var,
+    momentum: bn.momentum,
+    eps: bn.eps,
+  }
+}
+
+///|
+pub struct BatchNorm1dContext {
+  gamma : AutoTensor
+  beta : AutoTensor
+}
+
+///|
+pub fn BatchNorm1dModule::forward(
+  self : BatchNorm1dModule,
+  x : AutoTensor,
+  train? : Bool = true,
+) -> (AutoTensor, BatchNorm1dContext) {
+  let x_val = x.value()
+  let (mean, variance) = if train {
+    let (m, v) = module_batchnorm_stats(x_val)
+    for j = 0; j < self.running_mean.length(); j = j + 1 {
+      self.running_mean[j] = self.momentum * self.running_mean[j] +
+        (1.0 - self.momentum) * m[j]
+      self.running_var[j] = self.momentum * self.running_var[j] +
+        (1.0 - self.momentum) * v[j]
+    }
+    (m, v)
+  } else {
+    (self.running_mean, self.running_var)
+  }
+  let gamma = x.from_other(
+    self.gamma.get_data(),
+    requires_grad=self.gamma.requires_grad(),
+  )
+  let beta = x.from_other(
+    self.beta.get_data(),
+    requires_grad=self.beta.requires_grad(),
+  )
+  let out = module_batchnorm_forward_tensor(
+    x_val,
+    gamma.value(),
+    beta.value(),
+    mean,
+    variance,
+    self.eps,
+  )
+  let y = x.batchnorm1d_cached(
+    out,
+    module_array_to_tensor(mean),
+    module_array_to_tensor(variance),
+    gamma,
+    beta,
+    self.eps,
+    train~,
+  )
+  (y, { gamma, beta })
+}
+
+///|
+pub fn BatchNorm1dModule::sync_grads(
+  self : BatchNorm1dModule,
+  ctx : BatchNorm1dContext,
+) -> Unit {
+  self.gamma.set_grad(ctx.gamma.grad())
+  self.beta.set_grad(ctx.beta.grad())
+}
+
+///|
+pub fn BatchNorm1dModule::parameters(
+  self : BatchNorm1dModule,
+) -> Array[Parameter] {
+  [self.gamma, self.beta]
+}
+
+///|
+pub struct LayerNormModule {
+  gamma : Parameter
+  beta : Parameter
+  eps : Double
+}
+
+///|
+pub fn LayerNormModule::new(
+  num_features : Int,
+  eps? : Double = 1.0e-5,
+) -> LayerNormModule {
+  if num_features <= 0 {
+    abort("num_features 必须大于 0")
+  }
+  let gamma = Parameter::new(
+    @math.Tensor::new(Array::make(num_features, 1.0), [num_features]),
+  )
+  let beta = Parameter::new(
+    @math.Tensor::new(Array::make(num_features, 0.0), [num_features]),
+  )
+  { gamma, beta, eps }
+}
+
+///|
+pub fn LayerNormModule::from_layer(ln : LayerNorm) -> LayerNormModule {
+  {
+    gamma: Parameter::new(module_array_to_tensor(ln.gamma)),
+    beta: Parameter::new(module_array_to_tensor(ln.beta)),
+    eps: ln.eps,
+  }
+}
+
+///|
+pub struct LayerNormContext {
+  gamma : AutoTensor
+  beta : AutoTensor
+}
+
+///|
+pub fn LayerNormModule::forward(
+  self : LayerNormModule,
+  x : AutoTensor,
+) -> (AutoTensor, LayerNormContext) {
+  let gamma = x.from_other(
+    self.gamma.get_data(),
+    requires_grad=self.gamma.requires_grad(),
+  )
+  let beta = x.from_other(
+    self.beta.get_data(),
+    requires_grad=self.beta.requires_grad(),
+  )
+  let y = x.layernorm(gamma, beta, self.eps)
+  (y, { gamma, beta })
+}
+
+///|
+pub fn LayerNormModule::sync_grads(
+  self : LayerNormModule,
+  ctx : LayerNormContext,
+) -> Unit {
+  self.gamma.set_grad(ctx.gamma.grad())
+  self.beta.set_grad(ctx.beta.grad())
+}
+
+///|
+pub fn LayerNormModule::parameters(self : LayerNormModule) -> Array[Parameter] {
+  [self.gamma, self.beta]
+}
+
+///|
+pub struct EmbeddingModule {
+  weight : Parameter
+  num_embeddings : Int
+  dim : Int
+}
+
+///|
+pub fn EmbeddingModule::new(
+  num_embeddings : Int,
+  dim : Int,
+  seed? : Int = 42,
+) -> EmbeddingModule {
+  let emb = Embedding::new(num_embeddings, dim, seed~)
+  EmbeddingModule::from_layer(emb)
+}
+
+///|
+pub fn EmbeddingModule::from_layer(e : Embedding) -> EmbeddingModule {
+  let weight = module_matrix_to_tensor(@math.Matrix::new(e.weight))
+  {
+    weight: Parameter::new(weight),
+    num_embeddings: e.num_embeddings,
+    dim: e.dim,
+  }
+}
+
+///|
+pub struct EmbeddingContext {
+  weight : AutoTensor
+}
+
+///|
+pub fn EmbeddingModule::forward(
+  self : EmbeddingModule,
+  x : AutoTensor,
+) -> (AutoTensor, EmbeddingContext) {
+  let weight = x.from_other(
+    self.weight.get_data(),
+    requires_grad=self.weight.requires_grad(),
+  )
+  let y = x.embedding(weight)
+  (y, { weight, })
+}
+
+///|
+pub fn EmbeddingModule::sync_grads(
+  self : EmbeddingModule,
+  ctx : EmbeddingContext,
+) -> Unit {
+  self.weight.set_grad(ctx.weight.grad())
+}
+
+///|
+pub fn EmbeddingModule::parameters(self : EmbeddingModule) -> Array[Parameter] {
+  [self.weight]
+}
+
+///|
 pub enum Module {
   Linear(LinearModule)
   Relu
   Dropout(Dropout)
-  BatchNorm1d(BatchNorm1d)
-  LayerNorm(LayerNorm)
-  Embedding(Embedding)
+  BatchNorm1d(BatchNorm1dModule)
+  LayerNorm(LayerNormModule)
+  Embedding(EmbeddingModule)
   Sequential(Sequential)
   ModuleList(ModuleList)
 }
@@ -197,17 +493,17 @@ pub fn module_dropout(d : Dropout) -> Module {
 
 ///|
 pub fn module_batchnorm1d(bn : BatchNorm1d) -> Module {
-  BatchNorm1d(bn)
+  BatchNorm1d(BatchNorm1dModule::from_layer(bn))
 }
 
 ///|
 pub fn module_layernorm(ln : LayerNorm) -> Module {
-  LayerNorm(ln)
+  LayerNorm(LayerNormModule::from_layer(ln))
 }
 
 ///|
 pub fn module_embedding(e : Embedding) -> Module {
-  Embedding(e)
+  Embedding(EmbeddingModule::from_layer(e))
 }
 
 ///|
@@ -224,6 +520,9 @@ pub fn module_modulelist(m : ModuleList) -> Module {
 pub enum ModuleContext {
   None
   Linear(LinearContext)
+  BatchNorm1d(BatchNorm1dContext)
+  LayerNorm(LayerNormContext)
+  Embedding(EmbeddingContext)
   Sequential(Array[ModuleContext])
 }
 
@@ -245,44 +544,16 @@ pub fn module_forward(
       (y, ModuleContext::None)
     }
     BatchNorm1d(bn) => {
-      let (out, mean, variance) = bn.forward_with_cache(
-        x.value().to_matrix(),
-        train~,
-      )
-      let y = x.batchnorm1d_cached(
-        module_matrix_to_tensor(out),
-        module_array_to_tensor(mean),
-        module_array_to_tensor(variance),
-        module_array_to_tensor(bn.gamma),
-        module_array_to_tensor(bn.beta),
-        bn.eps,
-        train~,
-      )
-      (y, ModuleContext::None)
+      let (y, ctx) = bn.forward(x, train~)
+      (y, ModuleContext::BatchNorm1d(ctx))
     }
     LayerNorm(ln) => {
-      let y = x.layernorm(
-        module_array_to_tensor(ln.gamma),
-        module_array_to_tensor(ln.beta),
-        ln.eps,
-      )
-      (y, ModuleContext::None)
+      let (y, ctx) = ln.forward(x)
+      (y, ModuleContext::LayerNorm(ctx))
     }
     Embedding(e) => {
-      let v = x.value().to_vector().to_array()
-      let indices = Array::make(v.length(), 0)
-      for i = 0; i < v.length(); i = i + 1 {
-        indices[i] = v[i].to_int()
-      }
-      let out = e.forward(indices)
-      (
-        AutoTensor::from_other(
-          x,
-          module_matrix_to_tensor(out),
-          requires_grad=false,
-        ),
-        ModuleContext::None,
-      )
+      let (y, ctx) = e.forward(x)
+      (y, ModuleContext::Embedding(ctx))
     }
     Sequential(s) => {
       let seq = s
@@ -302,6 +573,21 @@ pub fn module_sync_grads(mod : Module, ctx : ModuleContext) -> Unit {
         ModuleContext::Linear(lc) => m.sync_grads(lc)
         _ => ()
       }
+    BatchNorm1d(m) =>
+      match ctx {
+        ModuleContext::BatchNorm1d(bc) => m.sync_grads(bc)
+        _ => ()
+      }
+    LayerNorm(m) =>
+      match ctx {
+        ModuleContext::LayerNorm(lc) => m.sync_grads(lc)
+        _ => ()
+      }
+    Embedding(m) =>
+      match ctx {
+        ModuleContext::Embedding(ec) => m.sync_grads(ec)
+        _ => ()
+      }
     Sequential(s) =>
       match ctx {
         ModuleContext::Sequential(c) => s.sync_grads(c)
@@ -315,6 +601,9 @@ pub fn module_sync_grads(mod : Module, ctx : ModuleContext) -> Unit {
 pub fn module_parameters(mod : Module) -> Array[Parameter] {
   match mod {
     Linear(m) => m.parameters()
+    BatchNorm1d(m) => m.parameters()
+    LayerNorm(m) => m.parameters()
+    Embedding(m) => m.parameters()
     Sequential(s) => s.parameters()
     ModuleList(m) => m.parameters()
     _ => []
