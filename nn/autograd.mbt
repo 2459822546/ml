@@ -507,6 +507,31 @@ pub fn AutoTensor::batchnorm1d_cached(
 }
 
 ///|
+pub fn AutoTensor::batchnorm2d_cached(
+  self : AutoTensor,
+  out : @math.Tensor,
+  mean : @math.Tensor,
+  variance : @math.Tensor,
+  gamma : AutoTensor,
+  beta : AutoTensor,
+  eps : Double,
+  train? : Bool = true,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.batchnorm2d_cached(
+    self.id,
+    gamma.id,
+    beta.id,
+    out,
+    mean,
+    variance,
+    eps,
+    train~,
+  )
+  { graph: g, id }
+}
+
+///|
 pub fn AutoTensor::layernorm(
   self : AutoTensor,
   gamma : AutoTensor,
@@ -775,6 +800,32 @@ pub fn ComputationGraph::batchnorm1d_cached(
     value: out,
     grad,
     op: BatchNorm1d,
+    parents: [x, gamma, beta],
+    requires_grad: true,
+    aux_tensors: [mean, variance],
+    aux_scalars: [eps],
+    aux_bool: train,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::batchnorm2d_cached(
+  self : ComputationGraph,
+  x : Int,
+  gamma : Int,
+  beta : Int,
+  out : @math.Tensor,
+  mean : @math.Tensor,
+  variance : @math.Tensor,
+  eps : Double,
+  train? : Bool = true,
+) -> Int {
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: BatchNorm2d,
     parents: [x, gamma, beta],
     requires_grad: true,
     aux_tensors: [mean, variance],
@@ -1061,6 +1112,74 @@ pub fn ComputationGraph::backward_with_grad(
             }
             grad_gamma.set([j], grad_gamma.get([j]) + sum_dy_xhat)
             grad_beta.set([j], grad_beta.get([j]) + sum_dy)
+          }
+        }
+        tensor_add_inplace(self.nodes[p0].grad, grad_x)
+        tensor_add_inplace(self.nodes[p1].grad, grad_gamma)
+        tensor_add_inplace(self.nodes[p2].grad, grad_beta)
+      }
+      BatchNorm2d => {
+        let g = node.grad
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        let p2 = node.parents[2]
+        let x = self.nodes[p0].value
+        let gamma = self.nodes[p1].value
+        let shape = x.get_shape()
+        if shape.length() != 4 {
+          abort("batchnorm2d 仅支持 4D 张量")
+        }
+        let n = shape[0]
+        let c = shape[1]
+        let h = shape[2]
+        let w = shape[3]
+        let mean = node.aux_tensors[0]
+        let variance = node.aux_tensors[1]
+        let eps = node.aux_scalars[0]
+        let grad_x = @math.Tensor::zeros([n, c, h, w])
+        let grad_gamma = @math.Tensor::zeros([c])
+        let grad_beta = @math.Tensor::zeros([c])
+        let nhw = (n * h * w).to_double()
+        for ci = 0; ci < c; ci = ci + 1 {
+          let mean_c = mean.get([ci])
+          let var_c = variance.get([ci])
+          let inv_std = 1.0 / (var_c + eps).sqrt()
+          let mut sum_dxhat = 0.0
+          let mut sum_dxhat_xmu = 0.0
+          let mut sum_xmu = 0.0
+          let mut sum_dy = 0.0
+          let mut sum_dy_xhat = 0.0
+          for ni = 0; ni < n; ni = ni + 1 {
+            for hi = 0; hi < h; hi = hi + 1 {
+              for wi = 0; wi < w; wi = wi + 1 {
+                let xmu = x.get([ni, ci, hi, wi]) - mean_c
+                sum_xmu = sum_xmu + xmu
+                let dy = g.get([ni, ci, hi, wi])
+                let xhat = xmu * inv_std
+                sum_dy = sum_dy + dy
+                sum_dy_xhat = sum_dy_xhat + dy * xhat
+                let dxhat = dy * gamma.get([ci])
+                sum_dxhat = sum_dxhat + dxhat
+                sum_dxhat_xmu = sum_dxhat_xmu + dxhat * xmu
+              }
+            }
+          }
+          grad_gamma.set([ci], grad_gamma.get([ci]) + sum_dy_xhat)
+          grad_beta.set([ci], grad_beta.get([ci]) + sum_dy)
+          let inv_std3 = inv_std * inv_std * inv_std
+          let dvar = sum_dxhat_xmu * -0.5 * inv_std3
+          let dmu = sum_dxhat * -inv_std +
+            dvar * -2.0 * sum_xmu / nhw
+          for ni = 0; ni < n; ni = ni + 1 {
+            for hi = 0; hi < h; hi = hi + 1 {
+              for wi = 0; wi < w; wi = wi + 1 {
+                let xmu = x.get([ni, ci, hi, wi]) - mean_c
+                let dxhat = g.get([ni, ci, hi, wi]) * gamma.get([ci])
+                let dx = dxhat * inv_std + dvar * 2.0 * xmu / nhw +
+                  dmu / nhw
+                grad_x.set([ni, ci, hi, wi], grad_x.get([ni, ci, hi, wi]) + dx)
+              }
+            }
           }
         }
         tensor_add_inplace(self.nodes[p0].grad, grad_x)
