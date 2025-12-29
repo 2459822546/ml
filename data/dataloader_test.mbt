@@ -6,7 +6,13 @@ test "dataloader drop_last and count" {
   let features = [[1.0], [2.0], [3.0], [4.0], [5.0]]
   let labels = [1.0, 2.0, 3.0, 4.0, 5.0]
   let ds = Dataset::new(features, labels)
-  let loader = DataLoader::new(ds, batch_size=2, shuffle=false, drop_last=true)
+  let loader = DataLoader::new(
+    ds,
+    batch_size=2,
+    shuffle=false,
+    drop_last=true,
+    num_workers=1,
+  )
   let batches = loader.all_batches()
   assert_eq(batches.length(), 2)
   assert_eq(batches[0].0.length(), 2)
@@ -34,6 +40,19 @@ test "dataloader deterministic shuffle" {
 }
 
 ///|
+test "dataloader seed control" {
+  let features = [[1.0], [2.0], [3.0]]
+  let labels = [1.0, 2.0, 3.0]
+  let ds = Dataset::new(features, labels)
+  let loader = DataLoader::new(ds, batch_size=2, shuffle=true, seed=5)
+  assert_eq(loader.epoch_seed(), 5)
+  loader.reset()
+  assert_eq(loader.epoch_seed(), 6)
+  loader.set_seed(9)
+  assert_eq(loader.epoch_seed(), 9)
+}
+
+///|
 test "dataloader iter walk through all samples" {
   let features = [[1.0], [2.0], [3.0]]
   let labels = [1.0, 2.0, 3.0]
@@ -51,4 +70,21 @@ test "dataloader iter walk through all samples" {
     }
   }
   assert_eq(seen, 3)
+}
+
+///|
+test "multidataloader basic batch" {
+  let features = [[1.0], [2.0], [3.0]]
+  let labels = [[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+  let ds = MultiDataset::new(features, labels)
+  let loader = MultiDataLoader::new(ds, batch_size=2, shuffle=false)
+  match loader.next_batch() {
+    Some((fs, ls)) => {
+      assert_eq(fs.length(), 2)
+      assert_eq(ls.length(), 2)
+      assert_eq(ls[0][0], 1.0)
+      assert_eq(ls[1][1], 1.0)
+    }
+    None => abort("no batch")
+  }
 }

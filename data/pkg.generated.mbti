@@ -66,24 +66,29 @@ pub struct DataFrameStats {
   columns : Array[String]
   stats : Array[ColumnStats]
 }
+fn DataFrameStats::to_string(Self) -> String
+fn DataFrameStats::to_table(Self) -> Array[Array[String]]
 
 pub struct DataLoader {
   dataset : Dataset
   batch_size : Int
   shuffle : Bool
   drop_last : Bool
-  base_seed : Int
+  mut base_seed : Int
+  num_workers : Int
   mut current_epoch : Int
   indices : Array[Int]
   mut current_idx : Int
 }
 fn DataLoader::all_batches(Self) -> Array[(Array[Array[Double]], Array[Double])]
+fn DataLoader::epoch_seed(Self) -> Int
 fn DataLoader::for_each_batch(Self, (Array[Array[Double]], Array[Double]) -> Unit) -> Unit
 fn DataLoader::iter(Self) -> DataLoaderIter
 fn DataLoader::n_batches(Self) -> Int
-fn DataLoader::new(Dataset, batch_size? : Int, shuffle? : Bool, drop_last? : Bool, seed? : Int) -> Self
+fn DataLoader::new(Dataset, batch_size? : Int, shuffle? : Bool, drop_last? : Bool, seed? : Int, num_workers? : Int) -> Self
 fn DataLoader::next_batch(Self) -> (Array[Array[Double]], Array[Double])?
 fn DataLoader::reset(Self) -> Unit
+fn DataLoader::set_seed(Self, Int) -> Unit
 
 pub struct DataLoaderIter {
   loader : DataLoader
