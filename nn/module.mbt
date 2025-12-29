@@ -43,6 +43,19 @@ pub fn Parameter::set_data(self : Parameter, data : @math.Tensor) -> Unit {
 }
 
 ///|
+pub fn Parameter::set_data_inplace(
+  self : Parameter,
+  data : @math.Tensor,
+) -> Unit {
+  self.data = data
+}
+
+///|
+pub fn Parameter::set_grad(self : Parameter, grad : @math.Tensor) -> Unit {
+  self.grad = grad
+}
+
+///|
 pub fn Parameter::get_data(self : Parameter) -> @math.Tensor {
   self.data
 }
