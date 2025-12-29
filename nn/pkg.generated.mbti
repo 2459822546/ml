@@ -105,19 +105,76 @@ fn AdamW::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double, weig
 fn AdamW::set_lr(Self, Double) -> Unit
 fn AdamW::step(Self, OptimParam) -> Unit
 
+pub struct BatchNorm1d {
+  gamma : Array[Double]
+  beta : Array[Double]
+  running_mean : Array[Double]
+  running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+fn BatchNorm1d::forward(Self, @math.Matrix, train? : Bool) -> @math.Matrix
+fn BatchNorm1d::new(Int, momentum? : Double, eps? : Double) -> Self
+
 pub struct ComputationGraph {
   nodes : Array[Node]
 }
 fn ComputationGraph::add(Self, Int, Int) -> Int
+fn ComputationGraph::add_bias(Self, Int, Int) -> Int
 fn ComputationGraph::add_input(Self, @math.Tensor, requires_grad? : Bool) -> Int
 fn ComputationGraph::backward(Self, Int) -> Unit
 fn ComputationGraph::backward_with_grad(Self, Int, @math.Tensor) -> Unit
 fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
+fn ComputationGraph::matmul(Self, Int, Int) -> Int
 fn ComputationGraph::mul(Self, Int, Int) -> Int
 fn ComputationGraph::new() -> Self
 fn ComputationGraph::relu(Self, Int) -> Int
 fn ComputationGraph::sub(Self, Int, Int) -> Int
+fn ComputationGraph::sum(Self, Int) -> Int
 fn ComputationGraph::value_of(Self, Int) -> @math.Tensor
+
+pub struct Dropout {
+  rate : Double
+  mut seed : Int
+}
+fn Dropout::forward(Self, @math.Matrix, train? : Bool) -> @math.Matrix
+fn Dropout::new(Double, seed? : Int) -> Self
+
+pub struct EarlyStopping {
+  mode : EarlyStoppingMode
+  patience : Int
+  min_delta : Double
+  mut best : Double
+  mut num_bad : Int
+  mut stopped : Bool
+}
+fn EarlyStopping::get_best(Self) -> Double
+fn EarlyStopping::new(EarlyStoppingMode, Int, min_delta? : Double) -> Self
+fn EarlyStopping::reset(Self) -> Unit
+fn EarlyStopping::should_stop(Self) -> Bool
+fn EarlyStopping::update(Self, Double) -> Bool
+
+pub enum EarlyStoppingMode {
+  Min
+  Max
+}
+
+pub struct Embedding {
+  weight : Array[Array[Double]]
+  num_embeddings : Int
+  dim : Int
+  seed : Int
+}
+fn Embedding::forward(Self, Array[Int]) -> @math.Matrix
+fn Embedding::new(Int, Int, seed? : Int) -> Self
+
+pub struct LayerNorm {
+  gamma : Array[Double]
+  beta : Array[Double]
+  eps : Double
+}
+fn LayerNorm::forward(Self, @math.Matrix) -> @math.Matrix
+fn LayerNorm::new(Int, eps? : Double) -> Self
 
 pub struct Linear {
   mut w : Array[Array[Double]]

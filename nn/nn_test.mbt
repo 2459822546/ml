@@ -11,6 +11,31 @@ test "linear forward shape" {
 }
 
 ///|
+test "layers basic" {
+  let x = @math.Matrix::new([[1.0, 1.0], [1.0, 1.0]])
+  let drop = Dropout::new(0.0, seed=1)
+  let dropped = drop.forward(x, train=true)
+  assert_eq(dropped.get(0, 0), 1.0)
+  let drop2 = Dropout::new(0.5, seed=7)
+  let dropped2 = drop2.forward(x, train=true)
+  let v = dropped2.get(0, 0)
+  assert_true(v == 0.0 || (v - 2.0).abs() < 1.0e-9)
+  let bn = BatchNorm1d::new(2)
+  let bn_out = bn.forward(@math.Matrix::new([[1.0, 2.0], [3.0, 4.0]]))
+  assert_true((bn_out.get(0, 0) + 1.0).abs() < 1.0e-4)
+  assert_true((bn_out.get(1, 1) - 1.0).abs() < 1.0e-4)
+  let ln = LayerNorm::new(2)
+  let ln_out = ln.forward(@math.Matrix::new([[1.0, 2.0], [3.0, 4.0]]))
+  assert_true((ln_out.get(0, 0) + 1.0).abs() < 1.0e-4)
+  assert_true((ln_out.get(1, 1) - 1.0).abs() < 1.0e-4)
+  let emb = Embedding::new(3, 2, seed=9)
+  let emb_out = emb.forward([0, 2])
+  assert_eq(emb_out.shape(), (2, 2))
+  assert_eq(emb_out.get(0, 0), emb.weight[0][0])
+  assert_eq(emb_out.get(1, 1), emb.weight[2][1])
+}
+
+///|
 test "activations basic" {
   let x = @math.Matrix::new([[-1.0, 0.0, 1.0]])
   let relu = activation_forward(x, act_relu())

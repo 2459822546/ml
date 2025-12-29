@@ -215,3 +215,225 @@ pub fn linear_rand_init(
   lin.set_params(w, b)
   lin
 }
+
+///|
+/// Dropout
+pub struct Dropout {
+  rate : Double
+  mut seed : Int
+}
+
+///|
+pub fn Dropout::new(rate : Double, seed? : Int = 42) -> Dropout {
+  if rate < 0.0 || rate >= 1.0 {
+    abort("rate 必须在 [0,1)")
+  }
+  { rate, seed }
+}
+
+///|
+pub fn Dropout::forward(
+  self : Dropout,
+  x : @math.Matrix,
+  train? : Bool = true,
+) -> @math.Matrix {
+  if not(train) || self.rate == 0.0 {
+    return x
+  }
+  let (n, m) = x.shape()
+  let out = @math.Matrix::zeros(n, m)
+  let keep = 1.0 - self.rate
+  let scale = 1.0 / keep
+  let mut rng = self.seed
+  for i = 0; i < n; i = i + 1 {
+    for j = 0; j < m; j = j + 1 {
+      rng = (1103515245 * rng + 12345) & 0x7fffffff
+      let r = rng.to_double() / (0x7fffffff).to_double()
+      if r < keep {
+        out.set(i, j, x.get(i, j) * scale)
+      } else {
+        out.set(i, j, 0.0)
+      }
+    }
+  }
+  self.seed = rng
+  out
+}
+
+///|
+/// BatchNorm1d
+pub struct BatchNorm1d {
+  gamma : Array[Double]
+  beta : Array[Double]
+  running_mean : Array[Double]
+  running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+
+///|
+pub fn BatchNorm1d::new(
+  num_features : Int,
+  momentum? : Double = 0.9,
+  eps? : Double = 1.0e-5,
+) -> BatchNorm1d {
+  if num_features <= 0 {
+    abort("num_features 必须大于 0")
+  }
+  if momentum < 0.0 || momentum > 1.0 {
+    abort("momentum 必须在 [0,1]")
+  }
+  let gamma = Array::make(num_features, 1.0)
+  let beta = Array::make(num_features, 0.0)
+  let running_mean = Array::make(num_features, 0.0)
+  let running_var = Array::make(num_features, 1.0)
+  { gamma, beta, running_mean, running_var, momentum, eps }
+}
+
+///|
+pub fn BatchNorm1d::forward(
+  self : BatchNorm1d,
+  x : @math.Matrix,
+  train? : Bool = true,
+) -> @math.Matrix {
+  let (n, m) = x.shape()
+  if m != self.gamma.length() {
+    abort("输入特征维度不匹配")
+  }
+  let mean = Array::make(m, 0.0)
+  let variance = Array::make(m, 0.0)
+  if train {
+    for j = 0; j < m; j = j + 1 {
+      let mut sum = 0.0
+      for i = 0; i < n; i = i + 1 {
+        sum = sum + x.get(i, j)
+      }
+      mean[j] = sum / n.to_double()
+    }
+    for j = 0; j < m; j = j + 1 {
+      let mut sum = 0.0
+      for i = 0; i < n; i = i + 1 {
+        let diff = x.get(i, j) - mean[j]
+        sum = sum + diff * diff
+      }
+      variance[j] = sum / n.to_double()
+    }
+    for j = 0; j < m; j = j + 1 {
+      self.running_mean[j] = self.momentum * self.running_mean[j] +
+        (1.0 - self.momentum) * mean[j]
+      self.running_var[j] = self.momentum * self.running_var[j] +
+        (1.0 - self.momentum) * variance[j]
+    }
+  } else {
+    for j = 0; j < m; j = j + 1 {
+      mean[j] = self.running_mean[j]
+      variance[j] = self.running_var[j]
+    }
+  }
+  let out = @math.Matrix::zeros(n, m)
+  for i = 0; i < n; i = i + 1 {
+    for j = 0; j < m; j = j + 1 {
+      let norm = (x.get(i, j) - mean[j]) / (variance[j] + self.eps).sqrt()
+      out.set(i, j, norm * self.gamma[j] + self.beta[j])
+    }
+  }
+  out
+}
+
+///|
+/// LayerNorm
+pub struct LayerNorm {
+  gamma : Array[Double]
+  beta : Array[Double]
+  eps : Double
+}
+
+///|
+pub fn LayerNorm::new(num_features : Int, eps? : Double = 1.0e-5) -> LayerNorm {
+  if num_features <= 0 {
+    abort("num_features 必须大于 0")
+  }
+  {
+    gamma: Array::make(num_features, 1.0),
+    beta: Array::make(num_features, 0.0),
+    eps,
+  }
+}
+
+///|
+pub fn LayerNorm::forward(self : LayerNorm, x : @math.Matrix) -> @math.Matrix {
+  let (n, m) = x.shape()
+  if m != self.gamma.length() {
+    abort("输入特征维度不匹配")
+  }
+  let out = @math.Matrix::zeros(n, m)
+  for i = 0; i < n; i = i + 1 {
+    let mut mean = 0.0
+    for j = 0; j < m; j = j + 1 {
+      mean = mean + x.get(i, j)
+    }
+    mean = mean / m.to_double()
+    let mut variance = 0.0
+    for j = 0; j < m; j = j + 1 {
+      let diff = x.get(i, j) - mean
+      variance = variance + diff * diff
+    }
+    variance = variance / m.to_double()
+    let denom = (variance + self.eps).sqrt()
+    for j = 0; j < m; j = j + 1 {
+      let norm = (x.get(i, j) - mean) / denom
+      out.set(i, j, norm * self.gamma[j] + self.beta[j])
+    }
+  }
+  out
+}
+
+///|
+/// Embedding
+pub struct Embedding {
+  weight : Array[Array[Double]]
+  num_embeddings : Int
+  dim : Int
+  seed : Int
+}
+
+///|
+pub fn Embedding::new(
+  num_embeddings : Int,
+  dim : Int,
+  seed? : Int = 42,
+) -> Embedding {
+  if num_embeddings <= 0 || dim <= 0 {
+    abort("num_embeddings/dim 必须大于 0")
+  }
+  let mut rng = seed
+  let weight = Array::make(num_embeddings, [])
+  let scale = (1.0 / dim.to_double()).sqrt()
+  for i = 0; i < num_embeddings; i = i + 1 {
+    let row = Array::make(dim, 0.0)
+    for j = 0; j < dim; j = j + 1 {
+      rng = (1103515245 * rng + 12345) & 0x7fffffff
+      let r = rng.to_double() / (0x7fffffff).to_double()
+      row[j] = (r * 2.0 - 1.0) * scale
+    }
+    weight[i] = row
+  }
+  { weight, num_embeddings, dim, seed: rng }
+}
+
+///|
+pub fn Embedding::forward(
+  self : Embedding,
+  indices : Array[Int],
+) -> @math.Matrix {
+  let n = indices.length()
+  let out = Array::make(n, [])
+  for i = 0; i < n; i = i + 1 {
+    let idx = indices[i]
+    if idx < 0 || idx >= self.num_embeddings {
+      abort("索引越界")
+    }
+    out[i] = self.weight[idx]
+  }
+  @math.Matrix::new(out)
+}
