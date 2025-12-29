@@ -13,7 +13,11 @@ pub struct ColumnStats {
   count : Int
   mean : Double
   std : Double
+  variance : Double
   min : Double
+  q25 : Double
+  median : Double
+  q75 : Double
   max : Double
 }
 
@@ -251,7 +255,11 @@ pub fn DataFrame::describe(self : DataFrame) -> DataFrameStats {
     count: 0,
     mean: @double.not_a_number,
     std: @double.not_a_number,
+    variance: @double.not_a_number,
     min: @double.not_a_number,
+    q25: @double.not_a_number,
+    median: @double.not_a_number,
+    q75: @double.not_a_number,
     max: @double.not_a_number,
   })
   if n_rows == 0 || n_cols == 0 {
@@ -262,12 +270,14 @@ pub fn DataFrame::describe(self : DataFrame) -> DataFrameStats {
     let mut count = 0
     let mut min_val = @double.not_a_number
     let mut max_val = @double.not_a_number
+    let values = []
     for row_idx = 0; row_idx < n_rows; row_idx = row_idx + 1 {
       let value = self.data[row_idx][col_idx]
       if is_nan(value) {
         continue
       }
       sum = sum + value
+      values.push(value)
       if count == 0 {
         min_val = value
         max_val = value
@@ -286,7 +296,11 @@ pub fn DataFrame::describe(self : DataFrame) -> DataFrameStats {
         count: 0,
         mean: @double.not_a_number,
         std: @double.not_a_number,
+        variance: @double.not_a_number,
         min: @double.not_a_number,
+        q25: @double.not_a_number,
+        median: @double.not_a_number,
+        q75: @double.not_a_number,
         max: @double.not_a_number,
       }
       continue
@@ -301,10 +315,81 @@ pub fn DataFrame::describe(self : DataFrame) -> DataFrameStats {
       let diff = value - mean
       var_sum = var_sum + diff * diff
     }
-    let std = (var_sum / count.to_double()).sqrt()
-    stats[col_idx] = { count, mean, std, min: min_val, max: max_val }
+    let variance = var_sum / count.to_double()
+    let std = variance.sqrt()
+    let sorted_values = to_sorted_values(values)
+    let q25 = calculate_percentile(sorted_values, 25.0)
+    let median = calculate_median(sorted_values)
+    let q75 = calculate_percentile(sorted_values, 75.0)
+    stats[col_idx] = {
+      count,
+      mean,
+      std,
+      variance,
+      min: min_val,
+      q25,
+      median,
+      q75,
+      max: max_val,
+    }
   }
   { n_rows, n_cols, columns: self.columns, stats }
+}
+
+///|
+/// 统计结果转换为表格数据（含表头）
+pub fn DataFrameStats::to_table(self : DataFrameStats) -> Array[Array[String]] {
+  let header = Array::make(self.n_cols + 1, "")
+  header[0] = "stat"
+  for i = 0; i < self.n_cols; i = i + 1 {
+    header[i + 1] = self.columns[i]
+  }
+  let stat_names = [
+    "count", "mean", "std", "variance", "min", "q25", "median", "q75", "max",
+  ]
+  let table = Array::make(stat_names.length() + 1, [])
+  table[0] = header
+  for i = 0; i < stat_names.length(); i = i + 1 {
+    let row = Array::make(self.n_cols + 1, "")
+    row[0] = stat_names[i]
+    for col_idx = 0; col_idx < self.n_cols; col_idx = col_idx + 1 {
+      let col_stat = self.stats[col_idx]
+      row[col_idx + 1] = match stat_names[i] {
+        "count" => col_stat.count.to_string()
+        "mean" => format_double(col_stat.mean)
+        "std" => format_double(col_stat.std)
+        "variance" => format_double(col_stat.variance)
+        "min" => format_double(col_stat.min)
+        "q25" => format_double(col_stat.q25)
+        "median" => format_double(col_stat.median)
+        "q75" => format_double(col_stat.q75)
+        _ => format_double(col_stat.max)
+      }
+    }
+    table[i + 1] = row
+  }
+  table
+}
+
+///|
+/// 统计结果字符串表示
+pub fn DataFrameStats::to_string(self : DataFrameStats) -> String {
+  let table = self.to_table()
+  let mut str = "DataFrameStats[\n"
+  for i = 0; i < table.length(); i = i + 1 {
+    let row = table[i]
+    str = str + "  "
+    for j = 0; j < row.length(); j = j + 1 {
+      str = str + row[j]
+      if j < row.length() - 1 {
+        str = str + "\t"
+      }
+    }
+    if i < table.length() - 1 {
+      str = str + "\n"
+    }
+  }
+  str + "\n]"
 }
 
 ///|
@@ -448,6 +533,61 @@ pub fn DataFrame::fillna(self : DataFrame, value : Double) -> DataFrame {
 /// NaN 判断
 fn is_nan(value : Double) -> Bool {
   value != value
+}
+
+///|
+/// Double 格式化（处理 NaN）
+fn format_double(value : Double) -> String {
+  if is_nan(value) {
+    "nan"
+  } else {
+    value.to_string()
+  }
+}
+
+///|
+/// 过滤并排序数值
+fn to_sorted_values(values : Array[Double]) -> Array[Double] {
+  let sorted = Array::make(values.length(), 0.0)
+  for i = 0; i < values.length(); i = i + 1 {
+    sorted[i] = values[i]
+  }
+  sorted.sort()
+  sorted
+}
+
+///|
+/// 计算中位数
+fn calculate_median(sorted_data : Array[Double]) -> Double {
+  let n = sorted_data.length()
+  if n == 0 {
+    @double.not_a_number
+  } else if n % 2 == 1 {
+    sorted_data[n / 2]
+  } else {
+    (sorted_data[n / 2 - 1] + sorted_data[n / 2]) / 2.0
+  }
+}
+
+///|
+/// 计算百分位数
+fn calculate_percentile(
+  sorted_data : Array[Double],
+  percentile : Double,
+) -> Double {
+  let n = sorted_data.length()
+  if n == 0 {
+    return @double.not_a_number
+  }
+  let index = percentile / 100.0 * (n - 1).to_double()
+  let lower = index.to_int()
+  let upper = lower + 1
+  if upper >= n {
+    sorted_data[n - 1]
+  } else {
+    let weight = index - lower.to_double()
+    sorted_data[lower] * (1.0 - weight) + sorted_data[upper] * weight
+  }
 }
 
 ///|

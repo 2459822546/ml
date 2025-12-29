@@ -24,7 +24,11 @@ pub struct ColumnStats {
   count : Int
   mean : Double
   std : Double
+  variance : Double
   min : Double
+  q25 : Double
+  median : Double
+  q75 : Double
   max : Double
 }
 
