@@ -593,6 +593,20 @@ fn tensor_exp(x : @math.Tensor) -> @math.Tensor {
 }
 
 ///|
+fn tensor_sign(x : @math.Tensor) -> @math.Tensor {
+  let shape = x.get_shape()
+  let strides = compute_strides(shape)
+  let total = x.total_size()
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    let v = x.get(idx)
+    data[i] = if v > 0.0 { 1.0 } else if v < 0.0 { -1.0 } else { 0.0 }
+  }
+  @math.Tensor::new(data, shape)
+}
+
+///|
 fn tensor_dropout(
   x : @math.Tensor,
   rate : Double,
