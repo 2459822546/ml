@@ -1652,6 +1652,80 @@ pub fn ComputationGraph::backward_with_grad(
         tensor_add_inplace(self.nodes[p1].grad, grad_w)
         tensor_add_inplace(self.nodes[p2].grad, grad_b)
       }
+      MaxPool2d => {
+        let g = node.grad
+        let p = node.parents[0]
+        let x = self.nodes[p].value
+        let shape = x.get_shape()
+        let n = shape[0]
+        let c = shape[1]
+        let out_shape = g.get_shape()
+        let out_h = out_shape[2]
+        let out_w = out_shape[3]
+        let idx_h = node.aux_tensors[0]
+        let idx_w = node.aux_tensors[1]
+        let grad_x = @math.Tensor::zeros(shape)
+        for ni = 0; ni < n; ni = ni + 1 {
+          for ci = 0; ci < c; ci = ci + 1 {
+            for oh = 0; oh < out_h; oh = oh + 1 {
+              for ow = 0; ow < out_w; ow = ow + 1 {
+                let ih = idx_h.get([ni, ci, oh, ow]).to_int()
+                let iw = idx_w.get([ni, ci, oh, ow]).to_int()
+                grad_x.set(
+                  [ni, ci, ih, iw],
+                  grad_x.get([ni, ci, ih, iw]) + g.get([ni, ci, oh, ow]),
+                )
+              }
+            }
+          }
+        }
+        tensor_add_inplace(self.nodes[p].grad, grad_x)
+      }
+      AvgPool2d => {
+        let g = node.grad
+        let p = node.parents[0]
+        let x = self.nodes[p].value
+        let shape = x.get_shape()
+        let n = shape[0]
+        let c = shape[1]
+        let h = shape[2]
+        let w = shape[3]
+        let out_shape = g.get_shape()
+        let out_h = out_shape[2]
+        let out_w = out_shape[3]
+        let kernel = node.aux_scalars[0].to_int()
+        let stride = node.aux_scalars[1].to_int()
+        let grad_x = @math.Tensor::zeros([n, c, h, w])
+        let scale = 1.0 / (kernel * kernel).to_double()
+        for ni = 0; ni < n; ni = ni + 1 {
+          for ci = 0; ci < c; ci = ci + 1 {
+            for oh = 0; oh < out_h; oh = oh + 1 {
+              for ow = 0; ow < out_w; ow = ow + 1 {
+                let gg = g.get([ni, ci, oh, ow]) * scale
+                for khi = 0; khi < kernel; khi = khi + 1 {
+                  for kwi = 0; kwi < kernel; kwi = kwi + 1 {
+                    let ih = oh * stride + khi
+                    let iw = ow * stride + kwi
+                    grad_x.set(
+                      [ni, ci, ih, iw],
+                      grad_x.get([ni, ci, ih, iw]) + gg,
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+        tensor_add_inplace(self.nodes[p].grad, grad_x)
+      }
+      Flatten2d => {
+        let g = node.grad
+        let p = node.parents[0]
+        let shape_t = node.aux_tensors[0]
+        let shape = tensor_tensor_to_shape(shape_t)
+        let back = tensor_reshape(g, shape)
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
     }
   }
 }
