@@ -139,6 +139,44 @@ test "embedding module grads" {
 }
 
 ///|
+test "state_dict load_state_dict basic" {
+  let linear = LinearModule::new(2, 2, seed=2)
+  linear.set_params(
+    @math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]),
+    @math.Tensor::new([0.5, -0.5], [2]),
+  )
+  let bn = BatchNorm1d::new(2)
+  let ln = LayerNorm::new(2)
+  let seq = Sequential::new([
+    module_linear(linear),
+    module_batchnorm1d(bn),
+    module_layernorm(ln),
+  ])
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let _ = seq.forward(x)
+  let state = seq.state_dict()
+  let params = seq.parameters()
+  params[0].set_data(@math.Tensor::zeros([2, 2]))
+  params[1].set_data(@math.Tensor::zeros([2]))
+  seq.load_state_dict(state)
+  let params_after = seq.parameters()
+  assert_eq(params_after[0].get_data().get([0, 0]), 1.0)
+  assert_eq(params_after[1].get_data().get([0]), 0.5)
+}
+
+///|
+test "embedding state_dict load" {
+  let emb = EmbeddingModule::new(3, 2, seed=1)
+  let state = module_state_dict(module_embedding_module(emb))
+  let params = emb.parameters()
+  let w0 = params[0].get_data().get([0, 0])
+  params[0].set_data(@math.Tensor::zeros([3, 2]))
+  module_load_state_dict(module_embedding_module(emb), state)
+  let w1 = emb.parameters()[0].get_data().get([0, 0])
+  assert_eq(w1, w0)
+}
+
+///|
 test "autotensor operators" {
   let a = AutoTensor::new(@math.Tensor::from_vector(@math.Vector::new([2.0])))
   let b = a.from_other(@math.Tensor::from_vector(@math.Vector::new([3.0])))

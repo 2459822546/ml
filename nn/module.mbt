@@ -28,6 +28,20 @@ fn module_array_to_tensor(values : Array[Double]) -> @math.Tensor {
 }
 
 ///|
+fn module_tensor_to_array(t : @math.Tensor) -> Array[Double] {
+  let shape = t.get_shape()
+  if shape.length() != 1 {
+    abort("只支持 1D Tensor 转数组")
+  }
+  let n = shape[0]
+  let out = Array::make(n, 0.0)
+  for i = 0; i < n; i = i + 1 {
+    out[i] = t.get([i])
+  }
+  out
+}
+
+///|
 fn module_batchnorm_stats(x : @math.Tensor) -> (Array[Double], Array[Double]) {
   let shape = x.get_shape()
   if shape.length() != 2 {
@@ -227,8 +241,8 @@ pub fn LinearModule::parameters(self : LinearModule) -> Array[Parameter] {
 pub struct BatchNorm1dModule {
   gamma : Parameter
   beta : Parameter
-  running_mean : Array[Double]
-  running_var : Array[Double]
+  mut running_mean : Array[Double]
+  mut running_var : Array[Double]
   momentum : Double
   eps : Double
 }
@@ -507,6 +521,11 @@ pub fn module_embedding(e : Embedding) -> Module {
 }
 
 ///|
+pub fn module_embedding_module(e : EmbeddingModule) -> Module {
+  Embedding(e)
+}
+
+///|
 pub fn module_sequential(s : Sequential) -> Module {
   Sequential(s)
 }
@@ -774,4 +793,266 @@ pub fn ModuleList::eval(self : ModuleList) -> Unit {
   for i = 0; i < self.modules.length(); i = i + 1 {
     self.modules[i] = module_eval(self.modules[i])
   }
+}
+
+///|
+fn module_state_dict_key(prefix : String, name : String) -> String {
+  if prefix == "" {
+    name
+  } else {
+    prefix + name
+  }
+}
+
+///|
+fn module_state_dict_add(
+  dict : Map[String, @math.Tensor],
+  key : String,
+  value : @math.Tensor,
+) -> Unit {
+  dict.set(key, value)
+}
+
+///|
+fn module_state_dict_into(
+  mod : Module,
+  prefix : String,
+  dict : Map[String, @math.Tensor],
+) -> Unit {
+  match mod {
+    Linear(m) => {
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "weight"),
+        m.weight.get_data(),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "bias"),
+        m.bias.get_data(),
+      )
+    }
+    BatchNorm1d(m) => {
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "gamma"),
+        m.gamma.get_data(),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "beta"),
+        m.beta.get_data(),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_mean"),
+        module_array_to_tensor(m.running_mean),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_var"),
+        module_array_to_tensor(m.running_var),
+      )
+    }
+    LayerNorm(m) => {
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "gamma"),
+        m.gamma.get_data(),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "beta"),
+        m.beta.get_data(),
+      )
+    }
+    Embedding(m) =>
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "weight"),
+        m.weight.get_data(),
+      )
+    Sequential(s) =>
+      for i = 0; i < s.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_state_dict_into(s.modules[i], sub_prefix, dict)
+      }
+    ModuleList(m) =>
+      for i = 0; i < m.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_state_dict_into(m.modules[i], sub_prefix, dict)
+      }
+    _ => ()
+  }
+}
+
+///|
+pub fn module_state_dict(
+  mod : Module,
+  prefix? : String = "",
+) -> Map[String, @math.Tensor] {
+  let dict = Map::new()
+  module_state_dict_into(mod, prefix, dict)
+  dict
+}
+
+///|
+fn module_state_dict_get(
+  dict : Map[String, @math.Tensor],
+  key : String,
+  strict : Bool,
+) -> @math.Tensor? {
+  match dict.get(key) {
+    Some(v) => Some(v)
+    None => if strict { abort("state_dict 缺少键: " + key) } else { None }
+  }
+}
+
+///|
+pub fn module_load_state_dict(
+  mod : Module,
+  dict : Map[String, @math.Tensor],
+  strict? : Bool = true,
+  prefix? : String = "",
+) -> Unit {
+  let strict_val = strict
+  match mod {
+    Linear(m) => {
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "weight"),
+          strict_val,
+        ) {
+        Some(v) => m.weight.set_data(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "bias"),
+          strict_val,
+        ) {
+        Some(v) => m.bias.set_data(v)
+        None => ()
+      }
+    }
+    BatchNorm1d(m) => {
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "gamma"),
+          strict_val,
+        ) {
+        Some(v) => m.gamma.set_data(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "beta"),
+          strict_val,
+        ) {
+        Some(v) => m.beta.set_data(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "running_mean"),
+          strict_val,
+        ) {
+        Some(v) => m.running_mean = module_tensor_to_array(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "running_var"),
+          strict_val,
+        ) {
+        Some(v) => m.running_var = module_tensor_to_array(v)
+        None => ()
+      }
+    }
+    LayerNorm(m) => {
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "gamma"),
+          strict_val,
+        ) {
+        Some(v) => m.gamma.set_data(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "beta"),
+          strict_val,
+        ) {
+        Some(v) => m.beta.set_data(v)
+        None => ()
+      }
+    }
+    Embedding(m) =>
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "weight"),
+          strict_val,
+        ) {
+        Some(v) => m.weight.set_data(v)
+        None => ()
+      }
+    Sequential(s) =>
+      for i = 0; i < s.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_load_state_dict(
+          s.modules[i],
+          dict,
+          strict=strict_val,
+          prefix=sub_prefix,
+        )
+      }
+    ModuleList(m) =>
+      for i = 0; i < m.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_load_state_dict(
+          m.modules[i],
+          dict,
+          strict=strict_val,
+          prefix=sub_prefix,
+        )
+      }
+    _ => ()
+  }
+}
+
+///|
+pub fn Sequential::state_dict(self : Sequential) -> Map[String, @math.Tensor] {
+  module_state_dict(Sequential(self))
+}
+
+///|
+pub fn Sequential::load_state_dict(
+  self : Sequential,
+  dict : Map[String, @math.Tensor],
+  strict? : Bool = true,
+) -> Unit {
+  module_load_state_dict(Sequential(self), dict, strict~)
+}
+
+///|
+pub fn ModuleList::state_dict(self : ModuleList) -> Map[String, @math.Tensor] {
+  module_state_dict(ModuleList(self))
+}
+
+///|
+pub fn ModuleList::load_state_dict(
+  self : ModuleList,
+  dict : Map[String, @math.Tensor],
+  strict? : Bool = true,
+) -> Unit {
+  module_load_state_dict(ModuleList(self), dict, strict~)
 }

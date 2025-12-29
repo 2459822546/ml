@@ -61,6 +61,8 @@ fn module_dropout(Dropout) -> Module
 
 fn module_embedding(Embedding) -> Module
 
+fn module_embedding_module(EmbeddingModule) -> Module
+
 fn module_eval(Module) -> Module
 
 fn module_forward(Module, AutoTensor, train? : Bool) -> (AutoTensor, ModuleContext)
@@ -69,6 +71,8 @@ fn module_layernorm(LayerNorm) -> Module
 
 fn module_linear(LinearModule) -> Module
 
+fn module_load_state_dict(Module, Map[String, @math.Tensor], strict? : Bool, prefix? : String) -> Unit
+
 fn module_modulelist(ModuleList) -> Module
 
 fn module_parameters(Module) -> Array[Parameter]
@@ -76,6 +80,8 @@ fn module_parameters(Module) -> Array[Parameter]
 fn module_relu() -> Module
 
 fn module_sequential(Sequential) -> Module
+
+fn module_state_dict(Module, prefix? : String) -> Map[String, @math.Tensor]
 
 fn module_sync_grads(Module, ModuleContext) -> Unit
 
@@ -237,8 +243,8 @@ pub struct BatchNorm1dContext {
 pub struct BatchNorm1dModule {
   gamma : Parameter
   beta : Parameter
-  running_mean : Array[Double]
-  running_var : Array[Double]
+  mut running_mean : Array[Double]
+  mut running_var : Array[Double]
   momentum : Double
   eps : Double
 }
@@ -411,8 +417,10 @@ pub struct ModuleList {
   mut train : Bool
 }
 fn ModuleList::eval(Self) -> Unit
+fn ModuleList::load_state_dict(Self, Map[String, @math.Tensor], strict? : Bool) -> Unit
 fn ModuleList::new(Array[Module]) -> Self
 fn ModuleList::parameters(Self) -> Array[Parameter]
+fn ModuleList::state_dict(Self) -> Map[String, @math.Tensor]
 fn ModuleList::train(Self) -> Unit
 
 pub struct Node {
@@ -519,8 +527,10 @@ pub struct Sequential {
 }
 fn Sequential::eval(Self) -> Unit
 fn Sequential::forward(Self, AutoTensor) -> (AutoTensor, Array[ModuleContext])
+fn Sequential::load_state_dict(Self, Map[String, @math.Tensor], strict? : Bool) -> Unit
 fn Sequential::new(Array[Module]) -> Self
 fn Sequential::parameters(Self) -> Array[Parameter]
+fn Sequential::state_dict(Self) -> Map[String, @math.Tensor]
 fn Sequential::sync_grads(Self, Array[ModuleContext]) -> Unit
 fn Sequential::train(Self) -> Unit
 
