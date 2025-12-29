@@ -105,6 +105,16 @@ test "Tensor - reshape" {
 }
 
 ///|
+test "Tensor - reshape infer -1" {
+  let t1 = Tensor::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+  let t2 = t1.reshape([3, -1])
+  let shape = t2.get_shape()
+  assert_eq(shape[0], 3)
+  assert_eq(shape[1], 2)
+  assert_eq(t2.get([1, 1]), 4.0)
+}
+
+///|
 test "Tensor - transpose (2D)" {
   let t1 = Tensor::new([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
   let t2 = t1.transpose()
