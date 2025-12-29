@@ -549,13 +549,217 @@ pub fn EmbeddingModule::parameters(self : EmbeddingModule) -> Array[Parameter] {
 }
 
 ///|
+pub struct Conv2dModule {
+  weight : Parameter
+  bias : Parameter
+  stride : Int
+  padding : Int
+}
+
+///|
+pub struct Conv2dContext {
+  weight : AutoTensor
+  bias : AutoTensor
+}
+
+///|
+pub fn Conv2dModule::new(
+  in_channels : Int,
+  out_channels : Int,
+  kernel_size : Int,
+  stride? : Int = 1,
+  padding? : Int = 0,
+  seed? : Int = 42,
+) -> Conv2dModule {
+  let conv = Conv2d::new(
+    in_channels,
+    out_channels,
+    kernel_size,
+    stride~,
+    padding~,
+    seed~,
+  )
+  {
+    weight: Parameter::new(conv.weight),
+    bias: Parameter::new(conv.bias),
+    stride: conv.stride,
+    padding: conv.padding,
+  }
+}
+
+///|
+pub fn Conv2dModule::set_params(
+  self : Conv2dModule,
+  weight : @math.Tensor,
+  bias : @math.Tensor,
+) -> Unit {
+  let shape_w = weight.get_shape()
+  let shape_b = bias.get_shape()
+  if shape_w.length() != 4 || shape_b.length() != 1 {
+    abort("conv2d 参数形状不匹配")
+  }
+  if shape_w[0] != shape_b[0] {
+    abort("conv2d bias 维度不匹配")
+  }
+  self.weight.set_data(weight)
+  self.bias.set_data(bias)
+}
+
+///|
+pub fn Conv2dModule::forward(
+  self : Conv2dModule,
+  x : AutoTensor,
+) -> (AutoTensor, Conv2dContext) {
+  let w = x.from_other(
+    self.weight.get_data(),
+    requires_grad=self.weight.requires_grad(),
+  )
+  let b = x.from_other(
+    self.bias.get_data(),
+    requires_grad=self.bias.requires_grad(),
+  )
+  let y = x.conv2d(w, b, self.stride, self.padding)
+  (y, { weight: w, bias: b })
+}
+
+///|
+pub fn Conv2dModule::sync_grads(
+  self : Conv2dModule,
+  ctx : Conv2dContext,
+) -> Unit {
+  self.weight.set_grad(ctx.weight.grad())
+  self.bias.set_grad(ctx.bias.grad())
+}
+
+///|
+pub fn Conv2dModule::parameters(self : Conv2dModule) -> Array[Parameter] {
+  [self.weight, self.bias]
+}
+
+///|
+pub struct BatchNorm2dModule {
+  gamma : Parameter
+  beta : Parameter
+  mut running_mean : Array[Double]
+  mut running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+
+///|
+pub struct BatchNorm2dContext {
+  gamma : AutoTensor
+  beta : AutoTensor
+}
+
+///|
+pub fn BatchNorm2dModule::new(
+  num_features : Int,
+  momentum? : Double = 0.9,
+  eps? : Double = 1.0e-5,
+) -> BatchNorm2dModule {
+  if num_features <= 0 {
+    abort("num_features 必须大于 0")
+  }
+  let gamma = Parameter::new(
+    @math.Tensor::new(Array::make(num_features, 1.0), [num_features]),
+  )
+  let beta = Parameter::new(
+    @math.Tensor::new(Array::make(num_features, 0.0), [num_features]),
+  )
+  let running_mean = Array::make(num_features, 0.0)
+  let running_var = Array::make(num_features, 1.0)
+  { gamma, beta, running_mean, running_var, momentum, eps }
+}
+
+///|
+pub fn BatchNorm2dModule::from_layer(bn : BatchNorm2d) -> BatchNorm2dModule {
+  let gamma = Parameter::new(module_array_to_tensor(bn.gamma))
+  let beta = Parameter::new(module_array_to_tensor(bn.beta))
+  {
+    gamma,
+    beta,
+    running_mean: bn.running_mean,
+    running_var: bn.running_var,
+    momentum: bn.momentum,
+    eps: bn.eps,
+  }
+}
+
+///|
+pub fn BatchNorm2dModule::forward(
+  self : BatchNorm2dModule,
+  x : AutoTensor,
+  train? : Bool = true,
+) -> (AutoTensor, BatchNorm2dContext) {
+  let x_val = x.value()
+  let (mean, variance) = if train {
+    let (m, v) = module_batchnorm2d_stats(x_val)
+    for j = 0; j < self.running_mean.length(); j = j + 1 {
+      self.running_mean[j] = self.momentum * self.running_mean[j] +
+        (1.0 - self.momentum) * m[j]
+      self.running_var[j] = self.momentum * self.running_var[j] +
+        (1.0 - self.momentum) * v[j]
+    }
+    (m, v)
+  } else {
+    (self.running_mean, self.running_var)
+  }
+  let gamma = x.from_other(
+    self.gamma.get_data(),
+    requires_grad=self.gamma.requires_grad(),
+  )
+  let beta = x.from_other(
+    self.beta.get_data(),
+    requires_grad=self.beta.requires_grad(),
+  )
+  let out = module_batchnorm2d_forward_tensor(
+    x_val,
+    gamma.value(),
+    beta.value(),
+    mean,
+    variance,
+    self.eps,
+  )
+  let y = x.batchnorm2d_cached(
+    out,
+    module_array_to_tensor(mean),
+    module_array_to_tensor(variance),
+    gamma,
+    beta,
+    self.eps,
+    train~,
+  )
+  (y, { gamma, beta })
+}
+
+///|
+pub fn BatchNorm2dModule::sync_grads(
+  self : BatchNorm2dModule,
+  ctx : BatchNorm2dContext,
+) -> Unit {
+  self.gamma.set_grad(ctx.gamma.grad())
+  self.beta.set_grad(ctx.beta.grad())
+}
+
+///|
+pub fn BatchNorm2dModule::parameters(
+  self : BatchNorm2dModule,
+) -> Array[Parameter] {
+  [self.gamma, self.beta]
+}
+
+///|
 pub enum Module {
   Linear(LinearModule)
   Relu
   Dropout(Dropout)
+  Dropout2d(Dropout2d)
   BatchNorm1d(BatchNorm1dModule)
+  BatchNorm2d(BatchNorm2dModule)
   LayerNorm(LayerNormModule)
   Embedding(EmbeddingModule)
+  Conv2d(Conv2dModule)
   Sequential(Sequential)
   ModuleList(ModuleList)
 }
@@ -576,8 +780,18 @@ pub fn module_dropout(d : Dropout) -> Module {
 }
 
 ///|
+pub fn module_dropout2d(d : Dropout2d) -> Module {
+  Dropout2d(d)
+}
+
+///|
 pub fn module_batchnorm1d(bn : BatchNorm1d) -> Module {
   BatchNorm1d(BatchNorm1dModule::from_layer(bn))
+}
+
+///|
+pub fn module_batchnorm2d(bn : BatchNorm2d) -> Module {
+  BatchNorm2d(BatchNorm2dModule::from_layer(bn))
 }
 
 ///|
@@ -596,6 +810,11 @@ pub fn module_embedding_module(e : EmbeddingModule) -> Module {
 }
 
 ///|
+pub fn module_conv2d(m : Conv2dModule) -> Module {
+  Conv2d(m)
+}
+
+///|
 pub fn module_sequential(s : Sequential) -> Module {
   Sequential(s)
 }
@@ -610,8 +829,10 @@ pub enum ModuleContext {
   None
   Linear(LinearContext)
   BatchNorm1d(BatchNorm1dContext)
+  BatchNorm2d(BatchNorm2dContext)
   LayerNorm(LayerNormContext)
   Embedding(EmbeddingContext)
+  Conv2d(Conv2dContext)
   Sequential(Array[ModuleContext])
 }
 
@@ -632,9 +853,18 @@ pub fn module_forward(
       d.seed = new_seed
       (y, ModuleContext::None)
     }
+    Dropout2d(d) => {
+      let (y, new_seed) = x.dropout2d(d.rate, d.seed, train~)
+      d.seed = new_seed
+      (y, ModuleContext::None)
+    }
     BatchNorm1d(bn) => {
       let (y, ctx) = bn.forward(x, train~)
       (y, ModuleContext::BatchNorm1d(ctx))
+    }
+    BatchNorm2d(bn) => {
+      let (y, ctx) = bn.forward(x, train~)
+      (y, ModuleContext::BatchNorm2d(ctx))
     }
     LayerNorm(ln) => {
       let (y, ctx) = ln.forward(x)
@@ -643,6 +873,10 @@ pub fn module_forward(
     Embedding(e) => {
       let (y, ctx) = e.forward(x)
       (y, ModuleContext::Embedding(ctx))
+    }
+    Conv2d(m) => {
+      let (y, ctx) = m.forward(x)
+      (y, ModuleContext::Conv2d(ctx))
     }
     Sequential(s) => {
       let seq = s
@@ -667,6 +901,11 @@ pub fn module_sync_grads(mod : Module, ctx : ModuleContext) -> Unit {
         ModuleContext::BatchNorm1d(bc) => m.sync_grads(bc)
         _ => ()
       }
+    BatchNorm2d(m) =>
+      match ctx {
+        ModuleContext::BatchNorm2d(bc) => m.sync_grads(bc)
+        _ => ()
+      }
     LayerNorm(m) =>
       match ctx {
         ModuleContext::LayerNorm(lc) => m.sync_grads(lc)
@@ -675,6 +914,11 @@ pub fn module_sync_grads(mod : Module, ctx : ModuleContext) -> Unit {
     Embedding(m) =>
       match ctx {
         ModuleContext::Embedding(ec) => m.sync_grads(ec)
+        _ => ()
+      }
+    Conv2d(m) =>
+      match ctx {
+        ModuleContext::Conv2d(cc) => m.sync_grads(cc)
         _ => ()
       }
     Sequential(s) =>
@@ -691,8 +935,10 @@ pub fn module_parameters(mod : Module) -> Array[Parameter] {
   match mod {
     Linear(m) => m.parameters()
     BatchNorm1d(m) => m.parameters()
+    BatchNorm2d(m) => m.parameters()
     LayerNorm(m) => m.parameters()
     Embedding(m) => m.parameters()
+    Conv2d(m) => m.parameters()
     Sequential(s) => s.parameters()
     ModuleList(m) => m.parameters()
     _ => []
@@ -924,6 +1170,28 @@ fn module_state_dict_into(
         module_array_to_tensor(m.running_var),
       )
     }
+    BatchNorm2d(m) => {
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "gamma"),
+        m.gamma.get_data(),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "beta"),
+        m.beta.get_data(),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_mean"),
+        module_array_to_tensor(m.running_mean),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_var"),
+        module_array_to_tensor(m.running_var),
+      )
+    }
     LayerNorm(m) => {
       module_state_dict_add(
         dict,
@@ -942,6 +1210,18 @@ fn module_state_dict_into(
         module_state_dict_key(prefix, "weight"),
         m.weight.get_data(),
       )
+    Conv2d(m) => {
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "weight"),
+        m.weight.get_data(),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "bias"),
+        m.bias.get_data(),
+      )
+    }
     Sequential(s) =>
       for i = 0; i < s.modules.length(); i = i + 1 {
         let sub_prefix = prefix + i.to_string() + "."
@@ -1045,6 +1325,44 @@ pub fn module_load_state_dict(
         None => ()
       }
     }
+    BatchNorm2d(m) => {
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "gamma"),
+          strict_val,
+        ) {
+        Some(v) => m.gamma.set_data(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "beta"),
+          strict_val,
+        ) {
+        Some(v) => m.beta.set_data(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "running_mean"),
+          strict_val,
+        ) {
+        Some(v) => m.running_mean = module_tensor_to_array(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "running_var"),
+          strict_val,
+        ) {
+        Some(v) => m.running_var = module_tensor_to_array(v)
+        None => ()
+      }
+    }
     LayerNorm(m) => {
       match
         module_state_dict_get(
@@ -1075,6 +1393,26 @@ pub fn module_load_state_dict(
         Some(v) => m.weight.set_data(v)
         None => ()
       }
+    Conv2d(m) => {
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "weight"),
+          strict_val,
+        ) {
+        Some(v) => m.weight.set_data(v)
+        None => ()
+      }
+      match
+        module_state_dict_get(
+          dict,
+          module_state_dict_key(prefix, "bias"),
+          strict_val,
+        ) {
+        Some(v) => m.bias.set_data(v)
+        None => ()
+      }
+    }
     Sequential(s) =>
       for i = 0; i < s.modules.length(); i = i + 1 {
         let sub_prefix = prefix + i.to_string() + "."
