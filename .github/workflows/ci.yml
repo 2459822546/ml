@@ -36,6 +36,16 @@ jobs:
         run: |
           moon coverage analyze > coverage-uncovered.log
 
+      - name: Fail if uncovered lines exceed threshold
+        run: |
+          MAX_UNCOVERED=0
+          UNCOVERED=$(grep -oE '^[0-9]+' coverage-uncovered.log | head -n 1 || echo 0)
+          echo "Uncovered lines: $UNCOVERED (threshold $MAX_UNCOVERED)"
+          if [ "$UNCOVERED" -gt "$MAX_UNCOVERED" ]; then
+            echo "Coverage threshold exceeded"
+            exit 1
+          fi
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
