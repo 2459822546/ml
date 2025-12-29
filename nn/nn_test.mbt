@@ -216,6 +216,28 @@ test "optimizer params step" {
 }
 
 ///|
+test "optimizer params step seq" {
+  let linear = LinearModule::new(2, 1, seed=1)
+  linear.set_params(
+    @math.Tensor::new([1.0, 2.0], [2, 1]),
+    @math.Tensor::new([0.0], [1]),
+  )
+  let seq = Sequential::new([module_linear(linear)])
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [1, 2]))
+  let (y, ctx) = seq.forward(x)
+  let loss = y.sum()
+  loss.backward()
+  seq.sync_grads(ctx)
+  let params_before = seq.parameters()
+  let w_before = params_before[0].get_data().get([0, 0])
+  let opt = SGDParams::new(0.1, params_before)
+  opt.step_seq(seq)
+  let params_after = seq.parameters()
+  let w_after = params_after[0].get_data().get([0, 0])
+  assert_true(w_after < w_before)
+}
+
+///|
 test "mlp forward logits" {
   let mlp = MLP::new(2, [3], 2, output_activation=act_softmax(), seed=1)
   let x = @math.Matrix::new([[0.0, 0.0], [1.0, 1.0]])
