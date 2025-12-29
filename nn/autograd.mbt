@@ -938,6 +938,10 @@ pub enum Op {
   AvgPool2d
   Flatten2d
   SoftmaxCrossEntropy
+  Reshape
+  Transpose
+  LogSoftmax
+  LogSumExp
 }
 
 ///|
@@ -1230,12 +1234,55 @@ pub fn AutoTensor::flatten2d(self : AutoTensor) -> AutoTensor {
 }
 
 ///|
+pub fn AutoTensor::reshape(self : AutoTensor, shape : Array[Int]) -> AutoTensor {
+  let g = self.graph
+  let id = g.reshape(self.id, shape)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::transpose(
+  self : AutoTensor,
+  axes? : Array[Int] = [],
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.transpose(self.id, axes)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::permute(self : AutoTensor, axes : Array[Int]) -> AutoTensor {
+  self.transpose(axes~)
+}
+
+///|
 pub fn AutoTensor::softmax_cross_entropy(
   self : AutoTensor,
   y_true : Array[Int],
 ) -> AutoTensor {
   let g = self.graph
   let id = g.softmax_cross_entropy(self.id, y_true)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::log_softmax(
+  self : AutoTensor,
+  axis? : Int = 1,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.log_softmax(self.id, axis)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::logsumexp(
+  self : AutoTensor,
+  axis? : Int = 1,
+  keepdim? : Bool = false,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.logsumexp(self.id, axis, keepdim~)
   { graph: g, id }
 }
 
@@ -1728,6 +1775,97 @@ pub fn ComputationGraph::flatten2d(self : ComputationGraph, x : Int) -> Int {
     aux_tensors: [tensor_shape_to_tensor(shape)],
     aux_scalars: [],
     aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::reshape(
+  self : ComputationGraph,
+  x : Int,
+  shape : Array[Int],
+) -> Int {
+  let vx = self.nodes[x].value
+  let out = tensor_reshape(vx, shape)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Reshape,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [tensor_shape_to_tensor(vx.get_shape())],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::transpose(
+  self : ComputationGraph,
+  x : Int,
+  axes : Array[Int],
+) -> Int {
+  let vx = self.nodes[x].value
+  let out = tensor_transpose(vx, axes)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Transpose,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [tensor_shape_to_tensor(axes)],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::log_softmax(
+  self : ComputationGraph,
+  x : Int,
+  axis : Int,
+) -> Int {
+  let vx = self.nodes[x].value
+  let lse = tensor_logsumexp_axis(vx, axis, keepdim=true)
+  let out = tensor_sub(vx, lse)
+  let probs = tensor_exp(out)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: LogSoftmax,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [probs],
+    aux_scalars: [axis.to_double()],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::logsumexp(
+  self : ComputationGraph,
+  x : Int,
+  axis : Int,
+  keepdim? : Bool = false,
+) -> Int {
+  let vx = self.nodes[x].value
+  let out = tensor_logsumexp_axis(vx, axis, keepdim~)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: LogSumExp,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [axis.to_double()],
+    aux_bool: keepdim,
   })
   self.nodes.length() - 1
 }
@@ -2294,6 +2432,61 @@ pub fn ComputationGraph::backward_with_grad(
           }
         }
         tensor_add_inplace(self.nodes[p].grad, grad_logits)
+      }
+      Reshape => {
+        let g = node.grad
+        let p = node.parents[0]
+        let shape = tensor_tensor_to_shape(node.aux_tensors[0])
+        let back = tensor_reshape(g, shape)
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      Transpose => {
+        let g = node.grad
+        let p = node.parents[0]
+        let x = self.nodes[p].value
+        let shape = x.get_shape()
+        let axes = tensor_tensor_to_shape(node.aux_tensors[0])
+        let real_axes = if axes.length() == 0 {
+          let rev = Array::make(shape.length(), 0)
+          for i = 0; i < shape.length(); i = i + 1 {
+            rev[i] = shape.length() - 1 - i
+          }
+          rev
+        } else {
+          axes
+        }
+        if real_axes.length() != shape.length() {
+          abort("transpose 轴长度不匹配")
+        }
+        let inv = Array::make(real_axes.length(), 0)
+        for i = 0; i < real_axes.length(); i = i + 1 {
+          let ax = real_axes[i]
+          inv[ax] = i
+        }
+        let back = tensor_transpose(g, inv)
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      LogSoftmax => {
+        let g = node.grad
+        let p = node.parents[0]
+        let probs = node.aux_tensors[0]
+        let axis = node.aux_scalars[0].to_int()
+        let sum_g = tensor_sum_axes(g, [axis], keepdim=true)
+        let back = tensor_sub(g, tensor_mul(probs, sum_g))
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      LogSumExp => {
+        let g = node.grad
+        let p = node.parents[0]
+        let x = self.nodes[p].value
+        let axis = node.aux_scalars[0].to_int()
+        let keepdim = node.aux_bool
+        let lse = node.value
+        let lse_b = tensor_expand_for_axis(lse, x.get_shape(), axis, keepdim)
+        let weights = tensor_exp(tensor_sub(x, lse_b))
+        let g_b = tensor_expand_for_axis(g, x.get_shape(), axis, keepdim)
+        let back = tensor_mul(weights, g_b)
+        tensor_add_inplace(self.nodes[p].grad, back)
       }
     }
   }
