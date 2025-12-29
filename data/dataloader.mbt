@@ -1,6 +1,67 @@
 ///|
 /// DataLoader - 数据加载器
 /// 用于批量加载数据，支持打乱和批处理
+/// Batch 规范：
+/// - features 形状为 [batch, features]
+/// - labels 为 Single([batch]) 或 Multi([batch, n_labels])
+pub enum BatchLabels {
+  Single(Array[Double])
+  Multi(Array[Array[Double]])
+}
+
+///|
+pub struct Batch {
+  features : Array[Array[Double]]
+  labels : BatchLabels
+}
+
+///|
+fn validate_batch_features(
+  features : Array[Array[Double]],
+  batch_size : Int,
+) -> Unit {
+  if features.length() != batch_size {
+    abort("batch features 和 labels 的样本数不匹配")
+  }
+  if features.length() == 0 {
+    return
+  }
+  let expected_dim = features[0].length()
+  for i = 0; i < features.length(); i = i + 1 {
+    if features[i].length() != expected_dim {
+      abort("batch 样本 \{i} 的特征维度不一致")
+    }
+  }
+}
+
+///|
+pub fn Batch::new_single(
+  features : Array[Array[Double]],
+  labels : Array[Double],
+) -> Batch {
+  validate_batch_features(features, labels.length())
+  { features, labels: Single(labels) }
+}
+
+///|
+pub fn Batch::new_multi(
+  features : Array[Array[Double]],
+  labels : Array[Array[Double]],
+) -> Batch {
+  validate_batch_features(features, labels.length())
+  if labels.length() == 0 {
+    return { features, labels: Multi(labels) }
+  }
+  let expected_dim = labels[0].length()
+  for i = 0; i < labels.length(); i = i + 1 {
+    if labels[i].length() != expected_dim {
+      abort("batch 样本 \{i} 的标签维度不一致")
+    }
+  }
+  { features, labels: Multi(labels) }
+}
+
+///|
 pub struct DataLoader {
   dataset : Dataset
   batch_size : Int

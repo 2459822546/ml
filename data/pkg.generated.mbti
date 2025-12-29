@@ -9,6 +9,13 @@ fn train_test_split(Array[Array[Double]], Array[Double], test_size? : Double, sh
 // Errors
 
 // Types and methods
+pub struct Batch {
+  features : Array[Array[Double]]
+  labels : BatchLabels
+}
+fn Batch::new_multi(Array[Array[Double]], Array[Array[Double]]) -> Self
+fn Batch::new_single(Array[Array[Double]], Array[Double]) -> Self
+
 pub struct BatchIterator {
   data : Array[Array[Double]]
   batch_size : Int
@@ -19,6 +26,11 @@ fn BatchIterator::n_batches(Self) -> Int
 fn BatchIterator::new(Array[Array[Double]], Int) -> Self
 fn BatchIterator::next(Self) -> Array[Array[Double]]?
 fn BatchIterator::reset(Self) -> Unit
+
+pub enum BatchLabels {
+  Single(Array[Double])
+  Multi(Array[Array[Double]])
+}
 
 pub struct ColumnStats {
   count : Int
