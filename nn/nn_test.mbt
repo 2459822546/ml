@@ -409,6 +409,29 @@ test "named parameters and buffers" {
 }
 
 ///|
+test "train and eval step" {
+  let linear = LinearModule::new(2, 2, seed=1)
+  linear.set_params(
+    @math.Tensor::new([1.0, 0.0, 0.0, 1.0], [2, 2]),
+    @math.Tensor::new([0.0, 0.0], [2]),
+  )
+  let seq = Sequential::new([module_linear(linear)])
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [1, 2]))
+  let labels = [0]
+  let w_before = seq.parameters()[0].get_data().get([0, 0])
+  let opt = optimizer_params_sgd(seq.parameters(), 0.1)
+  let (_loss, _opt2) = train_step(seq, x, labels, opt)
+  let w_after = seq.parameters()[0].get_data().get([0, 0])
+  assert_true(w_after > w_before)
+  let seq2 = Sequential::new([module_linear(LinearModule::new(2, 2, seed=2))])
+  let x2 = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [1, 2]))
+  let w_before2 = seq2.parameters()[0].get_data().get([0, 0])
+  let _loss2 = eval_step(seq2, x2, labels)
+  let w_after2 = seq2.parameters()[0].get_data().get([0, 0])
+  assert_true((w_after2 - w_before2).abs() < 1.0e-9)
+}
+
+///|
 test "mlp forward logits" {
   let mlp = MLP::new(2, [3], 2, output_activation=act_softmax(), seed=1)
   let x = @math.Matrix::new([[0.0, 0.0], [1.0, 1.0]])
