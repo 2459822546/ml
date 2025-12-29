@@ -350,8 +350,8 @@ fn tensor_conv2d(
                 let ih = oh * stride + khi - padding
                 let iw = ow * stride + kwi - padding
                 if ih >= 0 && ih < h && iw >= 0 && iw < wi {
-                  sum = sum + x.get([ni, ci, ih, iw]) *
-                    w.get([co, ci, khi, kwi])
+                  sum = sum +
+                    x.get([ni, ci, ih, iw]) * w.get([co, ci, khi, kwi])
                 }
               }
             }
@@ -1263,15 +1263,13 @@ pub fn ComputationGraph::backward_with_grad(
           grad_beta.set([ci], grad_beta.get([ci]) + sum_dy)
           let inv_std3 = inv_std * inv_std * inv_std
           let dvar = sum_dxhat_xmu * -0.5 * inv_std3
-          let dmu = sum_dxhat * -inv_std +
-            dvar * -2.0 * sum_xmu / nhw
+          let dmu = sum_dxhat * -inv_std + dvar * -2.0 * sum_xmu / nhw
           for ni = 0; ni < n; ni = ni + 1 {
             for hi = 0; hi < h; hi = hi + 1 {
               for wi = 0; wi < w; wi = wi + 1 {
                 let xmu = x.get([ni, ci, hi, wi]) - mean_c
                 let dxhat = g.get([ni, ci, hi, wi]) * gamma.get([ci])
-                let dx = dxhat * inv_std + dvar * 2.0 * xmu / nhw +
-                  dmu / nhw
+                let dx = dxhat * inv_std + dvar * 2.0 * xmu / nhw + dmu / nhw
                 grad_x.set([ni, ci, hi, wi], grad_x.get([ni, ci, hi, wi]) + dx)
               }
             }
