@@ -142,10 +142,12 @@ pub struct MultiDataLoader {
 fn MultiDataLoader::all_batches(Self) -> Array[(Array[Array[Double]], Array[Array[Double]])]
 fn MultiDataLoader::epoch_seed(Self) -> Int
 fn MultiDataLoader::for_each_batch(Self, (Array[Array[Double]], Array[Array[Double]]) -> Unit) -> Unit
+fn MultiDataLoader::for_each_batch_pack(Self, (Batch) -> Unit) -> Unit
 fn MultiDataLoader::iter(Self) -> MultiDataLoaderIter
 fn MultiDataLoader::n_batches(Self) -> Int
 fn MultiDataLoader::new(MultiDataset, batch_size? : Int, shuffle? : Bool, drop_last? : Bool, seed? : Int, num_workers? : Int) -> Self
 fn MultiDataLoader::next_batch(Self) -> (Array[Array[Double]], Array[Array[Double]])?
+fn MultiDataLoader::next_batch_pack(Self) -> Batch?
 fn MultiDataLoader::reset(Self) -> Unit
 fn MultiDataLoader::set_seed(Self, Int) -> Unit
 

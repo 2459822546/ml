@@ -481,6 +481,15 @@ pub fn MultiDataLoader::next_batch(
 }
 
 ///|
+/// 获取下一批数据（统一 Batch 结构）
+pub fn MultiDataLoader::next_batch_pack(self : MultiDataLoader) -> Batch? {
+  match self.next_batch() {
+    Some((features, labels)) => Some(Batch::new_multi(features, labels))
+    None => None
+  }
+}
+
+///|
 /// 获取所有批次
 pub fn MultiDataLoader::all_batches(
   self : MultiDataLoader,
@@ -510,6 +519,21 @@ pub fn MultiDataLoader::for_each_batch(
   while true {
     match self.next_batch() {
       Some((features, labels)) => f(features, labels)
+      None => break
+    }
+  }
+}
+
+///|
+/// 遍历所有批次（统一 Batch 结构）
+pub fn MultiDataLoader::for_each_batch_pack(
+  self : MultiDataLoader,
+  f : (Batch) -> Unit,
+) -> Unit {
+  self.reset()
+  while true {
+    match self.next_batch_pack() {
+      Some(batch) => f(batch)
       None => break
     }
   }
