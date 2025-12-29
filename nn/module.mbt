@@ -23,6 +23,11 @@ fn module_matrix_to_tensor(m : @math.Matrix) -> @math.Tensor {
 }
 
 ///|
+fn module_array_to_tensor(values : Array[Double]) -> @math.Tensor {
+  @math.Tensor::new(values, [values.length()])
+}
+
+///|
 pub fn Parameter::new(
   data : @math.Tensor,
   requires_grad? : Bool = true,
@@ -235,38 +240,33 @@ pub fn module_forward(
     }
     Relu => (x.relu(), ModuleContext::None)
     Dropout(d) => {
-      let mat = x.value().to_matrix()
-      let out = d.forward(mat, train~)
-      (
-        AutoTensor::from_other(
-          x,
-          module_matrix_to_tensor(out),
-          requires_grad=false,
-        ),
-        ModuleContext::None,
-      )
+      let (y, new_seed) = x.dropout(d.rate, d.seed, train~)
+      d.seed = new_seed
+      (y, ModuleContext::None)
     }
     BatchNorm1d(bn) => {
-      let out = bn.forward(x.value().to_matrix(), train~)
-      (
-        AutoTensor::from_other(
-          x,
-          module_matrix_to_tensor(out),
-          requires_grad=false,
-        ),
-        ModuleContext::None,
+      let (out, mean, variance) = bn.forward_with_cache(
+        x.value().to_matrix(),
+        train~,
       )
+      let y = x.batchnorm1d_cached(
+        module_matrix_to_tensor(out),
+        module_array_to_tensor(mean),
+        module_array_to_tensor(variance),
+        module_array_to_tensor(bn.gamma),
+        module_array_to_tensor(bn.beta),
+        bn.eps,
+        train~,
+      )
+      (y, ModuleContext::None)
     }
     LayerNorm(ln) => {
-      let out = ln.forward(x.value().to_matrix())
-      (
-        AutoTensor::from_other(
-          x,
-          module_matrix_to_tensor(out),
-          requires_grad=false,
-        ),
-        ModuleContext::None,
+      let y = x.layernorm(
+        module_array_to_tensor(ln.gamma),
+        module_array_to_tensor(ln.beta),
+        ln.eps,
       )
+      (y, ModuleContext::None)
     }
     Embedding(e) => {
       let v = x.value().to_vector().to_array()
