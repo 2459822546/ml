@@ -75,6 +75,27 @@ test "sequential module params and forward" {
 }
 
 ///|
+test "module train eval with dropout" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 1.0, 1.0, 1.0], [2, 2]))
+  let drop = Dropout::new(0.5, seed=3)
+  let seq = Sequential::new([module_dropout(drop)])
+  seq.eval()
+  let (y, _ctx) = seq.forward(x)
+  let out = y.value()
+  assert_eq(out.get([0, 0]), 1.0)
+  assert_eq(out.get([1, 1]), 1.0)
+}
+
+///|
+test "modulelist nested parameters" {
+  let linear = LinearModule::new(2, 1, seed=1)
+  let inner = ModuleList::new([module_linear(linear)])
+  let outer = ModuleList::new([module_modulelist(inner), module_relu()])
+  let params = outer.parameters()
+  assert_eq(params.length(), 2)
+}
+
+///|
 test "autotensor operators" {
   let a = AutoTensor::new(@math.Tensor::from_vector(@math.Vector::new([2.0])))
   let b = a.from_other(@math.Tensor::from_vector(@math.Vector::new([3.0])))
