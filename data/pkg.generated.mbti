@@ -95,10 +95,12 @@ pub struct DataLoader {
 fn DataLoader::all_batches(Self) -> Array[(Array[Array[Double]], Array[Double])]
 fn DataLoader::epoch_seed(Self) -> Int
 fn DataLoader::for_each_batch(Self, (Array[Array[Double]], Array[Double]) -> Unit) -> Unit
+fn DataLoader::for_each_batch_pack(Self, (Batch) -> Unit) -> Unit
 fn DataLoader::iter(Self) -> DataLoaderIter
 fn DataLoader::n_batches(Self) -> Int
 fn DataLoader::new(Dataset, batch_size? : Int, shuffle? : Bool, drop_last? : Bool, seed? : Int, num_workers? : Int) -> Self
 fn DataLoader::next_batch(Self) -> (Array[Array[Double]], Array[Double])?
+fn DataLoader::next_batch_pack(Self) -> Batch?
 fn DataLoader::reset(Self) -> Unit
 fn DataLoader::set_seed(Self, Int) -> Unit
 
