@@ -287,8 +287,31 @@ pub impl Div for Tensor with div(self, other) {
 /// 重塑张量
 pub fn Tensor::reshape(self : Tensor, new_shape : Array[Int]) -> Tensor {
   let mut new_size = 1
+  let mut inferred_idx = -1
   for i = 0; i < new_shape.length(); i = i + 1 {
-    new_size = new_size * new_shape[i]
+    let dim = new_shape[i]
+    if dim == -1 {
+      if inferred_idx != -1 {
+        abort("只能推断一个维度")
+      }
+      inferred_idx = i
+      continue
+    }
+    if dim <= 0 {
+      abort("张量维度必须大于0")
+    }
+    new_size = new_size * dim
+  }
+  let final_shape = Array::make(new_shape.length(), 0)
+  for i = 0; i < new_shape.length(); i = i + 1 {
+    final_shape[i] = new_shape[i]
+  }
+  if inferred_idx != -1 {
+    if new_size == 0 || self.size % new_size != 0 {
+      abort("无法推断形状")
+    }
+    final_shape[inferred_idx] = self.size / new_size
+    new_size = new_size * final_shape[inferred_idx]
   }
   if new_size != self.size {
     abort("新形状的总大小必须与原张量相同")
@@ -299,7 +322,7 @@ pub fn Tensor::reshape(self : Tensor, new_shape : Array[Int]) -> Tensor {
   for i = 0; i < self.size; i = i + 1 {
     new_data[i] = self.data[i]
   }
-  Tensor::new(new_data, new_shape)
+  Tensor::new(new_data, final_shape)
 }
 
 ///|
