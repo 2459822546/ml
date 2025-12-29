@@ -925,6 +925,8 @@ pub enum Op {
   MatMul
   AddBias
   Sum
+  SumAxis
+  MeanAxis
   Dropout
   Dropout2d
   BatchNorm1d
@@ -1058,6 +1060,28 @@ pub fn AutoTensor::add_bias(self : AutoTensor, bias : AutoTensor) -> AutoTensor 
 pub fn AutoTensor::sum(self : AutoTensor) -> AutoTensor {
   let g = self.graph
   let id = g.sum(self.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::sum_axis(
+  self : AutoTensor,
+  axis : Int,
+  keepdim? : Bool = false,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.sum_axis(self.id, axis, keepdim~)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::mean_axis(
+  self : AutoTensor,
+  axis : Int,
+  keepdim? : Bool = false,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.mean_axis(self.id, axis, keepdim~)
   { graph: g, id }
 }
 
@@ -1395,6 +1419,52 @@ pub fn ComputationGraph::sum(self : ComputationGraph, x : Int) -> Int {
     aux_tensors: [],
     aux_scalars: [],
     aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::sum_axis(
+  self : ComputationGraph,
+  x : Int,
+  axis : Int,
+  keepdim? : Bool = false,
+) -> Int {
+  let vx = self.nodes[x].value
+  let out = tensor_sum_axes(vx, [axis], keepdim~)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: SumAxis,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [tensor_shape_to_tensor(vx.get_shape())],
+    aux_scalars: [axis.to_double()],
+    aux_bool: keepdim,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::mean_axis(
+  self : ComputationGraph,
+  x : Int,
+  axis : Int,
+  keepdim? : Bool = false,
+) -> Int {
+  let vx = self.nodes[x].value
+  let out = tensor_mean_axes(vx, [axis], keepdim~)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: MeanAxis,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [tensor_shape_to_tensor(vx.get_shape())],
+    aux_scalars: [axis.to_double()],
+    aux_bool: keepdim,
   })
   self.nodes.length() - 1
 }
@@ -1813,6 +1883,23 @@ pub fn ComputationGraph::backward_with_grad(
         let base = tensor_ones_like(self.nodes[p].value)
         let back = tensor_scale(base, scalar)
         tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      SumAxis => {
+        let g = node.grad
+        let p = node.parents[0]
+        let shape = tensor_tensor_to_shape(node.aux_tensors[0])
+        let axis = node.aux_scalars[0].to_int()
+        let back = tensor_expand_for_axis(g, shape, axis, node.aux_bool)
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      MeanAxis => {
+        let g = node.grad
+        let p = node.parents[0]
+        let shape = tensor_tensor_to_shape(node.aux_tensors[0])
+        let axis = node.aux_scalars[0].to_int()
+        let back = tensor_expand_for_axis(g, shape, axis, node.aux_bool)
+        let scale = 1.0 / shape[axis].to_double()
+        tensor_add_inplace(self.nodes[p].grad, tensor_scale(back, scale))
       }
       Dropout => {
         let g = node.grad
