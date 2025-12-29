@@ -385,10 +385,10 @@ fn optim_indices_from_flat(
 
 ///|
 pub struct SGDParams {
-  lr : Double
-  momentum : Double
-  weight_decay : Double
-  velocities : Array[Array[Double]]
+  mut lr : Double
+  mut momentum : Double
+  mut weight_decay : Double
+  mut velocities : Array[Array[Double]]
 }
 
 ///|
@@ -450,12 +450,12 @@ pub fn SGDParams::step_seq(self : SGDParams, seq : Sequential) -> Unit {
 
 ///|
 pub struct AdamParams {
-  lr : Double
-  beta1 : Double
-  beta2 : Double
-  eps : Double
-  m : Array[Array[Double]]
-  v : Array[Array[Double]]
+  mut lr : Double
+  mut beta1 : Double
+  mut beta2 : Double
+  mut eps : Double
+  mut m : Array[Array[Double]]
+  mut v : Array[Array[Double]]
   mut t : Int
 }
 
@@ -522,13 +522,13 @@ pub fn AdamParams::step_seq(self : AdamParams, seq : Sequential) -> Unit {
 
 ///|
 pub struct AdamWParams {
-  lr : Double
-  beta1 : Double
-  beta2 : Double
-  eps : Double
-  weight_decay : Double
-  m : Array[Array[Double]]
-  v : Array[Array[Double]]
+  mut lr : Double
+  mut beta1 : Double
+  mut beta2 : Double
+  mut eps : Double
+  mut weight_decay : Double
+  mut m : Array[Array[Double]]
+  mut v : Array[Array[Double]]
   mut t : Int
 }
 
@@ -601,10 +601,10 @@ pub fn AdamWParams::step_seq(self : AdamWParams, seq : Sequential) -> Unit {
 
 ///|
 pub struct RMSPropParams {
-  lr : Double
-  alpha : Double
-  eps : Double
-  v : Array[Array[Double]]
+  mut lr : Double
+  mut alpha : Double
+  mut eps : Double
+  mut v : Array[Array[Double]]
 }
 
 ///|
@@ -663,9 +663,9 @@ pub fn RMSPropParams::step_seq(self : RMSPropParams, seq : Sequential) -> Unit {
 
 ///|
 pub struct AdagradParams {
-  lr : Double
-  eps : Double
-  h : Array[Array[Double]]
+  mut lr : Double
+  mut eps : Double
+  mut h : Array[Array[Double]]
 }
 
 ///|
@@ -1023,4 +1023,318 @@ pub fn optimizer_params_step(opt : OptimizerParams) -> OptimizerParams {
       Adagrad(o, params)
     }
   }
+}
+
+///|
+pub fn OptimizerParams::zero_grad(self : OptimizerParams) -> OptimizerParams {
+  optimizer_params_zero_grad(self)
+}
+
+///|
+pub fn OptimizerParams::step(self : OptimizerParams) -> OptimizerParams {
+  optimizer_params_step(self)
+}
+
+///|
+pub fn optimizer_params_state_dict(
+  opt : OptimizerParams,
+) -> Map[String, @math.Tensor] {
+  let dict = Map::new()
+  match opt {
+    SGD(s, _) => {
+      dict.set("type", @math.Tensor::new([0.0], [1]))
+      dict.set("lr", @math.Tensor::new([s.lr], [1]))
+      dict.set("momentum", @math.Tensor::new([s.momentum], [1]))
+      dict.set("weight_decay", @math.Tensor::new([s.weight_decay], [1]))
+      dict.set(
+        "velocity",
+        @math.Tensor::new(tensor_concat_flat(s.velocities), [
+          tensor_total_len(s.velocities),
+        ]),
+      )
+      dict.set("velocity_shapes", tensor_pack_shapes(s.velocities))
+    }
+    Adam(a, _) => {
+      dict.set("type", @math.Tensor::new([1.0], [1]))
+      dict.set("lr", @math.Tensor::new([a.lr], [1]))
+      dict.set("beta1", @math.Tensor::new([a.beta1], [1]))
+      dict.set("beta2", @math.Tensor::new([a.beta2], [1]))
+      dict.set("eps", @math.Tensor::new([a.eps], [1]))
+      dict.set("t", @math.Tensor::new([a.t.to_double()], [1]))
+      dict.set(
+        "m",
+        @math.Tensor::new(tensor_concat_flat(a.m), [tensor_total_len(a.m)]),
+      )
+      dict.set(
+        "v",
+        @math.Tensor::new(tensor_concat_flat(a.v), [tensor_total_len(a.v)]),
+      )
+      dict.set("m_shapes", tensor_pack_shapes(a.m))
+      dict.set("v_shapes", tensor_pack_shapes(a.v))
+    }
+    AdamW(a, _) => {
+      dict.set("type", @math.Tensor::new([2.0], [1]))
+      dict.set("lr", @math.Tensor::new([a.lr], [1]))
+      dict.set("beta1", @math.Tensor::new([a.beta1], [1]))
+      dict.set("beta2", @math.Tensor::new([a.beta2], [1]))
+      dict.set("eps", @math.Tensor::new([a.eps], [1]))
+      dict.set("weight_decay", @math.Tensor::new([a.weight_decay], [1]))
+      dict.set("t", @math.Tensor::new([a.t.to_double()], [1]))
+      dict.set(
+        "m",
+        @math.Tensor::new(tensor_concat_flat(a.m), [tensor_total_len(a.m)]),
+      )
+      dict.set(
+        "v",
+        @math.Tensor::new(tensor_concat_flat(a.v), [tensor_total_len(a.v)]),
+      )
+      dict.set("m_shapes", tensor_pack_shapes(a.m))
+      dict.set("v_shapes", tensor_pack_shapes(a.v))
+    }
+    RMSProp(r, _) => {
+      dict.set("type", @math.Tensor::new([3.0], [1]))
+      dict.set("lr", @math.Tensor::new([r.lr], [1]))
+      dict.set("alpha", @math.Tensor::new([r.alpha], [1]))
+      dict.set("eps", @math.Tensor::new([r.eps], [1]))
+      dict.set(
+        "v",
+        @math.Tensor::new(tensor_concat_flat(r.v), [tensor_total_len(r.v)]),
+      )
+      dict.set("v_shapes", tensor_pack_shapes(r.v))
+    }
+    Adagrad(a, _) => {
+      dict.set("type", @math.Tensor::new([4.0], [1]))
+      dict.set("lr", @math.Tensor::new([a.lr], [1]))
+      dict.set("eps", @math.Tensor::new([a.eps], [1]))
+      dict.set(
+        "h",
+        @math.Tensor::new(tensor_concat_flat(a.h), [tensor_total_len(a.h)]),
+      )
+      dict.set("h_shapes", tensor_pack_shapes(a.h))
+    }
+  }
+  dict
+}
+
+///|
+pub fn optimizer_params_load_state_dict(
+  opt : OptimizerParams,
+  dict : Map[String, @math.Tensor],
+  strict? : Bool = true,
+) -> OptimizerParams {
+  let strict_val = strict
+  fn get_req(
+    dict : Map[String, @math.Tensor],
+    key : String,
+    strict : Bool,
+  ) -> @math.Tensor? {
+    match dict.get(key) {
+      Some(v) => Some(v)
+      None =>
+        if strict {
+          abort("optimizer state 缺少键: " + key)
+        } else {
+          None
+        }
+    }
+  }
+
+  let load_type = match dict.get("type") {
+    Some(v) => v.get([0]).to_int()
+    None =>
+      if strict_val {
+        abort("optimizer state 缺少键: type")
+      } else {
+        -1
+      }
+  }
+  match opt {
+    SGD(s, params) => {
+      if strict_val && load_type != 0 {
+        abort("optimizer type 不匹配")
+      }
+      let lr = get_req(dict, "lr", strict_val)
+      let momentum = get_req(dict, "momentum", strict_val)
+      let weight_decay = get_req(dict, "weight_decay", strict_val)
+      let velocity = get_req(dict, "velocity", strict_val)
+      let shapes = get_req(dict, "velocity_shapes", strict_val)
+      match (lr, momentum, weight_decay, velocity, shapes) {
+        (Some(lr_t), Some(mom_t), Some(wd_t), Some(v_t), Some(s_t)) => {
+          s.lr = lr_t.get([0])
+          s.momentum = mom_t.get([0])
+          s.weight_decay = wd_t.get([0])
+          s.velocities = tensor_unpack_shapes(v_t, s_t)
+        }
+        _ => ()
+      }
+      SGD(s, params)
+    }
+    Adam(a, params) => {
+      if strict_val && load_type != 1 {
+        abort("optimizer type 不匹配")
+      }
+      let lr = get_req(dict, "lr", strict_val)
+      let beta1 = get_req(dict, "beta1", strict_val)
+      let beta2 = get_req(dict, "beta2", strict_val)
+      let eps = get_req(dict, "eps", strict_val)
+      let t = get_req(dict, "t", strict_val)
+      let m = get_req(dict, "m", strict_val)
+      let v = get_req(dict, "v", strict_val)
+      let m_shapes = get_req(dict, "m_shapes", strict_val)
+      let v_shapes = get_req(dict, "v_shapes", strict_val)
+      match (lr, beta1, beta2, eps, t, m, v, m_shapes, v_shapes) {
+        (
+          Some(lr_t),
+          Some(b1_t),
+          Some(b2_t),
+          Some(eps_t),
+          Some(t_t),
+          Some(m_t),
+          Some(v_t),
+          Some(ms_t),
+          Some(vs_t),
+        ) => {
+          a.lr = lr_t.get([0])
+          a.beta1 = b1_t.get([0])
+          a.beta2 = b2_t.get([0])
+          a.eps = eps_t.get([0])
+          a.t = t_t.get([0]).to_int()
+          a.m = tensor_unpack_shapes(m_t, ms_t)
+          a.v = tensor_unpack_shapes(v_t, vs_t)
+        }
+        _ => ()
+      }
+      Adam(a, params)
+    }
+    AdamW(a, params) => {
+      if strict_val && load_type != 2 {
+        abort("optimizer type 不匹配")
+      }
+      let lr = get_req(dict, "lr", strict_val)
+      let beta1 = get_req(dict, "beta1", strict_val)
+      let beta2 = get_req(dict, "beta2", strict_val)
+      let eps = get_req(dict, "eps", strict_val)
+      let weight_decay = get_req(dict, "weight_decay", strict_val)
+      let t = get_req(dict, "t", strict_val)
+      let m = get_req(dict, "m", strict_val)
+      let v = get_req(dict, "v", strict_val)
+      let m_shapes = get_req(dict, "m_shapes", strict_val)
+      let v_shapes = get_req(dict, "v_shapes", strict_val)
+      match (lr, beta1, beta2, eps, weight_decay, t, m, v, m_shapes, v_shapes) {
+        (
+          Some(lr_t),
+          Some(b1_t),
+          Some(b2_t),
+          Some(eps_t),
+          Some(wd_t),
+          Some(t_t),
+          Some(m_t),
+          Some(v_t),
+          Some(ms_t),
+          Some(vs_t),
+        ) => {
+          a.lr = lr_t.get([0])
+          a.beta1 = b1_t.get([0])
+          a.beta2 = b2_t.get([0])
+          a.eps = eps_t.get([0])
+          a.weight_decay = wd_t.get([0])
+          a.t = t_t.get([0]).to_int()
+          a.m = tensor_unpack_shapes(m_t, ms_t)
+          a.v = tensor_unpack_shapes(v_t, vs_t)
+        }
+        _ => ()
+      }
+      AdamW(a, params)
+    }
+    RMSProp(r, params) => {
+      if strict_val && load_type != 3 {
+        abort("optimizer type 不匹配")
+      }
+      let lr = get_req(dict, "lr", strict_val)
+      let alpha = get_req(dict, "alpha", strict_val)
+      let eps = get_req(dict, "eps", strict_val)
+      let v = get_req(dict, "v", strict_val)
+      let v_shapes = get_req(dict, "v_shapes", strict_val)
+      match (lr, alpha, eps, v, v_shapes) {
+        (Some(lr_t), Some(a_t), Some(eps_t), Some(v_t), Some(vs_t)) => {
+          r.lr = lr_t.get([0])
+          r.alpha = a_t.get([0])
+          r.eps = eps_t.get([0])
+          r.v = tensor_unpack_shapes(v_t, vs_t)
+        }
+        _ => ()
+      }
+      RMSProp(r, params)
+    }
+    Adagrad(a, params) => {
+      if strict_val && load_type != 4 {
+        abort("optimizer type 不匹配")
+      }
+      let lr = get_req(dict, "lr", strict_val)
+      let eps = get_req(dict, "eps", strict_val)
+      let h = get_req(dict, "h", strict_val)
+      let h_shapes = get_req(dict, "h_shapes", strict_val)
+      match (lr, eps, h, h_shapes) {
+        (Some(lr_t), Some(eps_t), Some(h_t), Some(hs_t)) => {
+          a.lr = lr_t.get([0])
+          a.eps = eps_t.get([0])
+          a.h = tensor_unpack_shapes(h_t, hs_t)
+        }
+        _ => ()
+      }
+      Adagrad(a, params)
+    }
+  }
+}
+
+///|
+fn tensor_total_len(xs : Array[Array[Double]]) -> Int {
+  let mut total = 0
+  for i = 0; i < xs.length(); i = i + 1 {
+    total = total + xs[i].length()
+  }
+  total
+}
+
+///|
+fn tensor_concat_flat(xs : Array[Array[Double]]) -> Array[Double] {
+  let total = tensor_total_len(xs)
+  let out = Array::make(total, 0.0)
+  let mut idx = 0
+  for i = 0; i < xs.length(); i = i + 1 {
+    for j = 0; j < xs[i].length(); j = j + 1 {
+      out[idx] = xs[i][j]
+      idx = idx + 1
+    }
+  }
+  out
+}
+
+///|
+fn tensor_pack_shapes(xs : Array[Array[Double]]) -> @math.Tensor {
+  let data = Array::make(xs.length(), 0.0)
+  for i = 0; i < xs.length(); i = i + 1 {
+    data[i] = xs[i].length().to_double()
+  }
+  @math.Tensor::new(data, [xs.length()])
+}
+
+///|
+fn tensor_unpack_shapes(
+  flat : @math.Tensor,
+  shape_tensor : @math.Tensor,
+) -> Array[Array[Double]] {
+  let n = shape_tensor.get_shape()[0]
+  let out = Array::make(n, [])
+  let mut offset = 0
+  for i = 0; i < n; i = i + 1 {
+    let len = shape_tensor.get([i]).to_int()
+    let arr = Array::make(len, 0.0)
+    for j = 0; j < len; j = j + 1 {
+      arr[j] = flat.get([offset + j])
+    }
+    out[i] = arr
+    offset = offset + len
+  }
+  out
 }

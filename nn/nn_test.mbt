@@ -353,12 +353,26 @@ test "optimizer params wrapper" {
   let p = Parameter::new(@math.Tensor::new([1.0], [1]))
   p.set_grad(@math.Tensor::new([0.1], [1]))
   let opt = optimizer_params_sgd([p], 0.1)
-  let opt2 = optimizer_params_step(opt)
+  let opt2 = opt.step()
   let v = p.get_data().get([0])
   assert_true((v - 0.99).abs() < 1.0e-9)
-  let _ = optimizer_params_zero_grad(opt2)
+  let _ = opt2.zero_grad()
   let g = p.get_grad().get([0])
   assert_true(g.abs() < 1.0e-9)
+}
+
+///|
+test "optimizer params state dict" {
+  let p = Parameter::new(@math.Tensor::new([1.0], [1]))
+  p.set_grad(@math.Tensor::new([0.1], [1]))
+  let opt = optimizer_params_sgd([p], 0.1, momentum=0.9)
+  let opt2 = opt.step()
+  let dict = optimizer_params_state_dict(opt2)
+  let opt3 = optimizer_params_sgd([p], 0.01, momentum=0.0)
+  let opt4 = optimizer_params_load_state_dict(opt3, dict)
+  let dict2 = optimizer_params_state_dict(opt4)
+  let lr = dict2.get("lr").unwrap().get([0])
+  assert_true((lr - 0.1).abs() < 1.0e-9)
 }
 
 ///|
