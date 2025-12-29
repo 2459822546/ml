@@ -302,7 +302,12 @@ pub fn module_sync_grads(mod : Module, ctx : ModuleContext) -> Unit {
         ModuleContext::Linear(lc) => m.sync_grads(lc)
         _ => ()
       }
-    Relu => ()
+    Sequential(s) =>
+      match ctx {
+        ModuleContext::Sequential(c) => s.sync_grads(c)
+        _ => ()
+      }
+    _ => ()
   }
 }
 
@@ -310,18 +315,67 @@ pub fn module_sync_grads(mod : Module, ctx : ModuleContext) -> Unit {
 pub fn module_parameters(mod : Module) -> Array[Parameter] {
   match mod {
     Linear(m) => m.parameters()
-    Relu => []
+    Sequential(s) => s.parameters()
+    ModuleList(m) => m.parameters()
+    _ => []
+  }
+}
+
+///|
+pub fn module_train(mod : Module) -> Module {
+  match mod {
+    Sequential(s) => {
+      let seq = s
+      seq.train = true
+      for i = 0; i < seq.modules.length(); i = i + 1 {
+        seq.modules[i] = module_train(seq.modules[i])
+      }
+      Sequential(seq)
+    }
+    ModuleList(m) => {
+      let ml = m
+      ml.train = true
+      for i = 0; i < ml.modules.length(); i = i + 1 {
+        ml.modules[i] = module_train(ml.modules[i])
+      }
+      ModuleList(ml)
+    }
+    _ => mod
+  }
+}
+
+///|
+pub fn module_eval(mod : Module) -> Module {
+  match mod {
+    Sequential(s) => {
+      let seq = s
+      seq.train = false
+      for i = 0; i < seq.modules.length(); i = i + 1 {
+        seq.modules[i] = module_eval(seq.modules[i])
+      }
+      Sequential(seq)
+    }
+    ModuleList(m) => {
+      let ml = m
+      ml.train = false
+      for i = 0; i < ml.modules.length(); i = i + 1 {
+        ml.modules[i] = module_eval(ml.modules[i])
+      }
+      ModuleList(ml)
+    }
+    _ => mod
   }
 }
 
 ///|
 pub struct Sequential {
   modules : Array[Module]
+  mut train : Bool
 }
 
 ///|
 pub fn Sequential::new(modules : Array[Module]) -> Sequential {
-  { modules, }
+  { modules, train: true }
 }
 
 ///|
@@ -332,7 +386,7 @@ pub fn Sequential::forward(
   let contexts = Array::make(self.modules.length(), ModuleContext::None)
   let mut out = x
   for i = 0; i < self.modules.length(); i = i + 1 {
-    let (y, ctx) = module_forward(self.modules[i], out)
+    let (y, ctx) = module_forward(self.modules[i], out, train=self.train)
     contexts[i] = ctx
     out = y
   }
@@ -372,13 +426,30 @@ pub fn Sequential::parameters(self : Sequential) -> Array[Parameter] {
 }
 
 ///|
+pub fn Sequential::train(self : Sequential) -> Unit {
+  self.train = true
+  for i = 0; i < self.modules.length(); i = i + 1 {
+    self.modules[i] = module_train(self.modules[i])
+  }
+}
+
+///|
+pub fn Sequential::eval(self : Sequential) -> Unit {
+  self.train = false
+  for i = 0; i < self.modules.length(); i = i + 1 {
+    self.modules[i] = module_eval(self.modules[i])
+  }
+}
+
+///|
 pub struct ModuleList {
   modules : Array[Module]
+  mut train : Bool
 }
 
 ///|
 pub fn ModuleList::new(modules : Array[Module]) -> ModuleList {
-  { modules, }
+  { modules, train: true }
 }
 
 ///|
@@ -398,4 +469,20 @@ pub fn ModuleList::parameters(self : ModuleList) -> Array[Parameter] {
     out[i] = params[i]
   }
   out
+}
+
+///|
+pub fn ModuleList::train(self : ModuleList) -> Unit {
+  self.train = true
+  for i = 0; i < self.modules.length(); i = i + 1 {
+    self.modules[i] = module_train(self.modules[i])
+  }
+}
+
+///|
+pub fn ModuleList::eval(self : ModuleList) -> Unit {
+  self.train = false
+  for i = 0; i < self.modules.length(); i = i + 1 {
+    self.modules[i] = module_eval(self.modules[i])
+  }
 }
