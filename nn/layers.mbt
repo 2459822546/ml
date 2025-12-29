@@ -296,6 +296,16 @@ pub fn BatchNorm1d::forward(
   x : @math.Matrix,
   train? : Bool = true,
 ) -> @math.Matrix {
+  let (out, _mean, _var) = self.forward_with_cache(x, train~)
+  out
+}
+
+///|
+pub fn BatchNorm1d::forward_with_cache(
+  self : BatchNorm1d,
+  x : @math.Matrix,
+  train? : Bool = true,
+) -> (@math.Matrix, Array[Double], Array[Double]) {
   let (n, m) = x.shape()
   if m != self.gamma.length() {
     abort("输入特征维度不匹配")
@@ -337,7 +347,7 @@ pub fn BatchNorm1d::forward(
       out.set(i, j, norm * self.gamma[j] + self.beta[j])
     }
   }
-  out
+  (out, mean, variance)
 }
 
 ///|
