@@ -517,56 +517,111 @@ pub fn Tensor::flatten(self : Tensor) -> Tensor {
 ///|
 /// 沿指定轴求和
 pub fn Tensor::sum_axis(self : Tensor, axis : Int) -> Tensor {
-  if axis < 0 || axis >= self.ndim() {
-    abort("轴索引越界")
-  }
+  self.sum_axes([axis])
+}
 
-  // 计算结果形状（移除指定轴）
-  let new_shape_list = []
-  for i = 0; i < self.shape.length(); i = i + 1 {
-    if i != axis {
-      new_shape_list.push(self.shape[i])
-    }
-  }
-  let new_shape = Array::make(new_shape_list.length(), 0)
-  for i = 0; i < new_shape_list.length(); i = i + 1 {
-    new_shape[i] = new_shape_list[i]
-  }
-  let mut result_size = 1
-  for i = 0; i < new_shape.length(); i = i + 1 {
-    result_size = result_size * new_shape[i]
-  }
-  let result_data = Array::make(result_size, 0.0)
+///|
+/// 沿指定轴求均值
+pub fn Tensor::mean_axis(self : Tensor, axis : Int) -> Tensor {
+  self.mean_axes([axis])
+}
 
-  // 对于2D张量的简化实现
-  if self.ndim() == 2 {
-    let rows = self.shape[0]
-    let cols = self.shape[1]
-    if axis == 0 {
-      // 按行求和，结果是列向量
-      for j = 0; j < cols; j = j + 1 {
-        let mut sum = 0.0
-        for i = 0; i < rows; i = i + 1 {
-          sum = sum + self.data[i * cols + j]
-        }
-        result_data[j] = sum
-      }
-    } else {
-      // 按列求和，结果是行向量
-      for i = 0; i < rows; i = i + 1 {
-        let mut sum = 0.0
-        for j = 0; j < cols; j = j + 1 {
-          sum = sum + self.data[i * cols + j]
-        }
-        result_data[i] = sum
-      }
-    }
+///|
+/// 沿多个轴求和
+pub fn Tensor::sum_axes(
+  self : Tensor,
+  axes : Array[Int],
+  keepdim? : Bool = false,
+) -> Tensor {
+  if axes.length() == 0 {
+    return self.copy()
   }
-  if new_shape.length() == 0 {
-    Tensor::new(result_data, [1])
+  let ndim = self.ndim()
+  let reduce_mask = Array::make(ndim, false)
+  for i = 0; i < axes.length(); i = i + 1 {
+    let ax = axes[i]
+    if ax < 0 || ax >= ndim {
+      abort("轴索引越界")
+    }
+    if reduce_mask[ax] {
+      abort("轴重复")
+    }
+    reduce_mask[ax] = true
+  }
+  if not(keepdim) && axes.length() == ndim {
+    return Tensor::new([self.sum()], [1])
+  }
+  let out_shape = if keepdim {
+    let s = Array::make(ndim, 0)
+    for d = 0; d < ndim; d = d + 1 {
+      s[d] = if reduce_mask[d] { 1 } else { self.shape[d] }
+    }
+    s
   } else {
-    Tensor::new(result_data, new_shape)
+    let s = Array::make(ndim - axes.length(), 0)
+    let mut pos = 0
+    for d = 0; d < ndim; d = d + 1 {
+      if not(reduce_mask[d]) {
+        s[pos] = self.shape[d]
+        pos = pos + 1
+      }
+    }
+    s
   }
+  let out_strides = compute_strides_for_shape(out_shape)
+  let mut out_size = 1
+  for i = 0; i < out_shape.length(); i = i + 1 {
+    out_size = out_size * out_shape[i]
+  }
+  let result_data = Array::make(out_size, 0.0)
+  for i = 0; i < self.size; i = i + 1 {
+    let coords = indices_from_flat(self.shape, self.strides, i)
+    let out_indices = if keepdim {
+      let tmp = Array::make(ndim, 0)
+      for d = 0; d < ndim; d = d + 1 {
+        tmp[d] = if reduce_mask[d] { 0 } else { coords[d] }
+      }
+      tmp
+    } else {
+      let tmp = Array::make(out_shape.length(), 0)
+      let mut pos = 0
+      for d = 0; d < ndim; d = d + 1 {
+        if not(reduce_mask[d]) {
+          tmp[pos] = coords[d]
+          pos = pos + 1
+        }
+      }
+      tmp
+    }
+    let mut out_idx = 0
+    for d = 0; d < out_indices.length(); d = d + 1 {
+      out_idx = out_idx + out_indices[d] * out_strides[d]
+    }
+    result_data[out_idx] = result_data[out_idx] + self.data[i]
+  }
+  Tensor::new(result_data, out_shape)
+}
+
+///|
+/// 沿多个轴求均值
+pub fn Tensor::mean_axes(
+  self : Tensor,
+  axes : Array[Int],
+  keepdim? : Bool = false,
+) -> Tensor {
+  if axes.length() == 0 {
+    return self.copy()
+  }
+  let mut denom = 1.0
+  for i = 0; i < axes.length(); i = i + 1 {
+    let ax = axes[i]
+    if ax < 0 || ax >= self.ndim() {
+      abort("轴索引越界")
+    }
+    denom = denom * self.shape[ax].to_double()
+  }
+  let sum = self.sum_axes(axes, keepdim~)
+  sum.scalar_mul(1.0 / denom)
 }
 
 ///| 统计函数
