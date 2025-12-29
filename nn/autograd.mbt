@@ -277,9 +277,12 @@ pub enum Op {
   AddBias
   Sum
   Dropout
+  Dropout2d
   BatchNorm1d
+  BatchNorm2d
   LayerNorm
   Embedding
+  Conv2d
 }
 
 ///|
