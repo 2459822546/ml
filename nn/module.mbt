@@ -1017,17 +1017,20 @@ pub fn module_sync_grads(mod : Module, ctx : ModuleContext) -> Unit {
 
 ///|
 pub fn module_parameters(mod : Module) -> Array[Parameter] {
-  match mod {
-    Linear(m) => m.parameters()
-    BatchNorm1d(m) => m.parameters()
-    BatchNorm2d(m) => m.parameters()
-    LayerNorm(m) => m.parameters()
-    Embedding(m) => m.parameters()
-    Conv2d(m) => m.parameters()
-    Sequential(s) => s.parameters()
-    ModuleList(m) => m.parameters()
-    _ => []
+  let items = module_named_parameters_list(mod)
+  let params = []
+  for i = 0; i < items.length(); i = i + 1 {
+    let (_name, p) = items[i]
+    params.push(p)
   }
+  let out = Array::make(
+    params.length(),
+    Parameter::new(@math.Tensor::zeros([1])),
+  )
+  for i = 0; i < params.length(); i = i + 1 {
+    out[i] = params[i]
+  }
+  out
 }
 
 ///|
@@ -1117,21 +1120,7 @@ pub fn Sequential::sync_grads(
 
 ///|
 pub fn Sequential::parameters(self : Sequential) -> Array[Parameter] {
-  let params = []
-  for i = 0; i < self.modules.length(); i = i + 1 {
-    let p = module_parameters(self.modules[i])
-    for j = 0; j < p.length(); j = j + 1 {
-      params.push(p[j])
-    }
-  }
-  let out = Array::make(
-    params.length(),
-    Parameter::new(@math.Tensor::zeros([1])),
-  )
-  for i = 0; i < params.length(); i = i + 1 {
-    out[i] = params[i]
-  }
-  out
+  module_parameters(Sequential(self))
 }
 
 ///|
@@ -1163,21 +1152,7 @@ pub fn ModuleList::new(modules : Array[Module]) -> ModuleList {
 
 ///|
 pub fn ModuleList::parameters(self : ModuleList) -> Array[Parameter] {
-  let params = []
-  for i = 0; i < self.modules.length(); i = i + 1 {
-    let p = module_parameters(self.modules[i])
-    for j = 0; j < p.length(); j = j + 1 {
-      params.push(p[j])
-    }
-  }
-  let out = Array::make(
-    params.length(),
-    Parameter::new(@math.Tensor::zeros([1])),
-  )
-  for i = 0; i < params.length(); i = i + 1 {
-    out[i] = params[i]
-  }
-  out
+  module_parameters(ModuleList(self))
 }
 
 ///|
