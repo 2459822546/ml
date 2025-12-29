@@ -111,7 +111,11 @@ fn module_modulelist(ModuleList) -> Module
 
 fn module_named_buffers(Module, prefix? : String) -> Map[String, @math.Tensor]
 
+fn module_named_buffers_list(Module, prefix? : String) -> Array[(String, @math.Tensor)]
+
 fn module_named_parameters(Module, prefix? : String) -> Map[String, Parameter]
+
+fn module_named_parameters_list(Module, prefix? : String) -> Array[(String, Parameter)]
 
 fn module_parameters(Module) -> Array[Parameter]
 
@@ -661,7 +665,9 @@ pub struct ModuleList {
 fn ModuleList::eval(Self) -> Unit
 fn ModuleList::load_state_dict(Self, Map[String, @math.Tensor], strict? : Bool) -> Unit
 fn ModuleList::named_buffers(Self) -> Map[String, @math.Tensor]
+fn ModuleList::named_buffers_list(Self) -> Array[(String, @math.Tensor)]
 fn ModuleList::named_parameters(Self) -> Map[String, Parameter]
+fn ModuleList::named_parameters_list(Self) -> Array[(String, Parameter)]
 fn ModuleList::new(Array[Module]) -> Self
 fn ModuleList::parameters(Self) -> Array[Parameter]
 fn ModuleList::state_dict(Self) -> Map[String, @math.Tensor]
@@ -805,7 +811,9 @@ fn Sequential::eval(Self) -> Unit
 fn Sequential::forward(Self, AutoTensor) -> (AutoTensor, Array[ModuleContext])
 fn Sequential::load_state_dict(Self, Map[String, @math.Tensor], strict? : Bool) -> Unit
 fn Sequential::named_buffers(Self) -> Map[String, @math.Tensor]
+fn Sequential::named_buffers_list(Self) -> Array[(String, @math.Tensor)]
 fn Sequential::named_parameters(Self) -> Map[String, Parameter]
+fn Sequential::named_parameters_list(Self) -> Array[(String, Parameter)]
 fn Sequential::new(Array[Module]) -> Self
 fn Sequential::parameters(Self) -> Array[Parameter]
 fn Sequential::state_dict(Self) -> Map[String, @math.Tensor]
