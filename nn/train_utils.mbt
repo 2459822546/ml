@@ -143,6 +143,44 @@ pub fn clip_grad_value(params : Array[OptimParam], clip_value : Double) -> Unit 
 
 ///|
 /// 标准化训练一步：forward + loss + backward + step
+fn batch_labels_to_indices(labels : Array[Double]) -> Array[Int] {
+  let out = Array::make(labels.length(), 0)
+  for i = 0; i < labels.length(); i = i + 1 {
+    let v = labels[i]
+    let idx = v.to_int()
+    if idx < 0 || idx.to_double() != v {
+      abort("labels 需为非负整数类标")
+    }
+    out[i] = idx
+  }
+  out
+}
+
+///|
+fn batch_features_to_autotensor(features : Array[Array[Double]]) -> AutoTensor {
+  AutoTensor::new(@math.Tensor::from_matrix(@math.Matrix::new(features)))
+}
+
+///|
+pub fn train_step_batch(
+  model : Sequential,
+  batch : @data.Batch,
+  opt : OptimizerParams,
+) -> (Double, OptimizerParams) {
+  match batch.labels {
+    @data.Single(labels) => {
+      if batch.features.length() != labels.length() {
+        abort("batch features 和 labels 的样本数不匹配")
+      }
+      let x = batch_features_to_autotensor(batch.features)
+      let y_true = batch_labels_to_indices(labels)
+      train_step(model, x, y_true, opt)
+    }
+    @data.Multi(_) => abort("train_step_batch 仅支持单标签分类数据")
+  }
+}
+
+///|
 pub fn train_step(
   model : Sequential,
   x : AutoTensor,
@@ -161,6 +199,21 @@ pub fn train_step(
 
 ///|
 /// 标准化评估一步：forward + loss
+pub fn eval_step_batch(model : Sequential, batch : @data.Batch) -> Double {
+  match batch.labels {
+    @data.Single(labels) => {
+      if batch.features.length() != labels.length() {
+        abort("batch features 和 labels 的样本数不匹配")
+      }
+      let x = batch_features_to_autotensor(batch.features)
+      let y_true = batch_labels_to_indices(labels)
+      eval_step(model, x, y_true)
+    }
+    @data.Multi(_) => abort("eval_step_batch 仅支持单标签分类数据")
+  }
+}
+
+///|
 pub fn eval_step(
   model : Sequential,
   x : AutoTensor,

@@ -169,6 +169,8 @@ fn step_decay(Double, Double, Int, Int) -> Double
 
 fn train_step(Sequential, AutoTensor, Array[Int], OptimizerParams) -> (Double, OptimizerParams)
 
+fn train_step_batch(Sequential, @data.Batch, OptimizerParams) -> (Double, OptimizerParams)
+
 fn warmup_cosine(Double, Double, Int, Int, Int) -> Double
 
 // Errors
