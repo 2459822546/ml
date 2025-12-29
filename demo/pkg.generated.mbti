@@ -1,0 +1,14 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "2459822546/ml/demo"
+
+// Values
+fn cnn_train_demo() -> Double
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+
