@@ -55,15 +55,31 @@ fn mae_loss(Array[Double], Array[Double]) -> Double
 
 fn mlp_train_loop(MLP, @data.DataLoader, Int, (MLP, Array[Array[Double]], Array[Double], Int, Int) -> MLP) -> MLP
 
-fn module_forward(Module, AutoTensor) -> (AutoTensor, ModuleContext)
+fn module_batchnorm1d(BatchNorm1d) -> Module
+
+fn module_dropout(Dropout) -> Module
+
+fn module_embedding(Embedding) -> Module
+
+fn module_eval(Module) -> Module
+
+fn module_forward(Module, AutoTensor, train? : Bool) -> (AutoTensor, ModuleContext)
+
+fn module_layernorm(LayerNorm) -> Module
 
 fn module_linear(LinearModule) -> Module
+
+fn module_modulelist(ModuleList) -> Module
 
 fn module_parameters(Module) -> Array[Parameter]
 
 fn module_relu() -> Module
 
+fn module_sequential(Sequential) -> Module
+
 fn module_sync_grads(Module, ModuleContext) -> Unit
+
+fn module_train(Module) -> Module
 
 fn mse_loss(Array[Double], Array[Double]) -> Double
 
@@ -311,18 +327,28 @@ fn MLP::new(Int, Array[Int], Int, output_activation? : Activation, seed? : Int) 
 pub enum Module {
   Linear(LinearModule)
   Relu
+  Dropout(Dropout)
+  BatchNorm1d(BatchNorm1d)
+  LayerNorm(LayerNorm)
+  Embedding(Embedding)
+  Sequential(Sequential)
+  ModuleList(ModuleList)
 }
 
 pub enum ModuleContext {
   None
   Linear(LinearContext)
+  Sequential(Array[ModuleContext])
 }
 
 pub struct ModuleList {
   modules : Array[Module]
+  mut train : Bool
 }
+fn ModuleList::eval(Self) -> Unit
 fn ModuleList::new(Array[Module]) -> Self
 fn ModuleList::parameters(Self) -> Array[Parameter]
+fn ModuleList::train(Self) -> Unit
 
 pub struct Node {
   value : @math.Tensor
