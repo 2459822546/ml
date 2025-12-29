@@ -220,6 +220,123 @@ pub fn ComputationGraph::new() -> ComputationGraph {
 }
 
 ///|
+/// 简易 tensor 风格封装
+pub struct AutoTensor {
+  graph : ComputationGraph
+  id : Int
+}
+
+///|
+pub fn AutoTensor::new(
+  value : @math.Tensor,
+  requires_grad? : Bool = true,
+) -> AutoTensor {
+  let g = ComputationGraph::new()
+  let id = g.add_input(value, requires_grad~)
+  { graph: g, id }
+}
+
+///|
+/// 基于已有张量的计算图创建新的输入
+pub fn AutoTensor::from_other(
+  other : AutoTensor,
+  value : @math.Tensor,
+  requires_grad? : Bool = true,
+) -> AutoTensor {
+  let g = other.graph
+  let id = g.add_input(value, requires_grad~)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::value(self : AutoTensor) -> @math.Tensor {
+  self.graph.value_of(self.id)
+}
+
+///|
+pub fn AutoTensor::grad(self : AutoTensor) -> @math.Tensor {
+  self.graph.grad_of(self.id)
+}
+
+///|
+pub fn AutoTensor::backward(self : AutoTensor) -> Unit {
+  self.graph.backward(self.id)
+}
+
+///|
+pub fn AutoTensor::backward_with_grad(
+  self : AutoTensor,
+  grad : @math.Tensor,
+) -> Unit {
+  self.graph.backward_with_grad(self.id, grad)
+}
+
+///|
+pub fn AutoTensor::add(self : AutoTensor, other : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.add(self.id, other.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::sub(self : AutoTensor, other : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.sub(self.id, other.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::mul(self : AutoTensor, other : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.mul(self.id, other.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::relu(self : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.relu(self.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::matmul(self : AutoTensor, other : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.matmul(self.id, other.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::add_bias(self : AutoTensor, bias : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.add_bias(self.id, bias.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::sum(self : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.sum(self.id)
+  { graph: g, id }
+}
+
+///|
+/// 运算符重载
+pub impl Add for AutoTensor with add(self, other) {
+  self.add(other)
+}
+
+///|
+pub impl Sub for AutoTensor with sub(self, other) {
+  self.sub(other)
+}
+
+///|
+pub impl Mul for AutoTensor with mul(self, other) {
+  self.mul(other)
+}
+
+///|
 pub fn ComputationGraph::add_input(
   self : ComputationGraph,
   value : @math.Tensor,

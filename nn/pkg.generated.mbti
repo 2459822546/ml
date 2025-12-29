@@ -130,6 +130,27 @@ fn AdamW::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double, weig
 fn AdamW::set_lr(Self, Double) -> Unit
 fn AdamW::step(Self, OptimParam) -> Unit
 
+pub struct AutoTensor {
+  graph : ComputationGraph
+  id : Int
+}
+fn AutoTensor::add(Self, Self) -> Self
+fn AutoTensor::add_bias(Self, Self) -> Self
+fn AutoTensor::backward(Self) -> Unit
+fn AutoTensor::backward_with_grad(Self, @math.Tensor) -> Unit
+fn AutoTensor::from_other(Self, @math.Tensor, requires_grad? : Bool) -> Self
+fn AutoTensor::grad(Self) -> @math.Tensor
+fn AutoTensor::matmul(Self, Self) -> Self
+fn AutoTensor::mul(Self, Self) -> Self
+fn AutoTensor::new(@math.Tensor, requires_grad? : Bool) -> Self
+fn AutoTensor::relu(Self) -> Self
+fn AutoTensor::sub(Self, Self) -> Self
+fn AutoTensor::sum(Self) -> Self
+fn AutoTensor::value(Self) -> @math.Tensor
+impl Add for AutoTensor
+impl Mul for AutoTensor
+impl Sub for AutoTensor
+
 pub struct BatchNorm1d {
   gamma : Array[Double]
   beta : Array[Double]

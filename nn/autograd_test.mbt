@@ -39,3 +39,19 @@ test "matmul add_bias sum gradients" {
   assert_eq(gb.get([0]), 2.0)
   assert_eq(gb.get([1]), 2.0)
 }
+
+///|
+test "autotensor style gradients" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [2, 2]))
+  let w = x.from_other(@math.Tensor::new([1.0, 0.0, 0.0, 1.0], [2, 2]))
+  let b = x.from_other(@math.Tensor::new([0.5, -0.5], [2]))
+  let y = x.matmul(w).add_bias(b)
+  let loss = y.sum()
+  loss.backward()
+  let gw = w.grad()
+  assert_true((gw.get([0, 0]) - 4.0).abs() < 1.0e-9)
+  assert_true((gw.get([1, 1]) - 6.0).abs() < 1.0e-9)
+  let gb = b.grad()
+  assert_eq(gb.get([0]), 2.0)
+  assert_eq(gb.get([1]), 2.0)
+}
