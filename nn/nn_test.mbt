@@ -177,6 +177,31 @@ test "embedding state_dict load" {
 }
 
 ///|
+test "conv2d forward and grads" {
+  let conv = Conv2dModule::new(1, 1, 1, stride=1, padding=0, seed=1)
+  conv.set_params(
+    @math.Tensor::new([2.0], [1, 1, 1, 1]),
+    @math.Tensor::new([0.5], [1]),
+  )
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [1, 1, 2, 2]))
+  let (y, ctx) = conv.forward(x)
+  let out = y.value()
+  assert_eq(out.get([0, 0, 0, 0]), 2.5)
+  assert_eq(out.get([0, 0, 1, 1]), 8.5)
+  let loss = y.sum()
+  loss.backward()
+  conv.sync_grads(ctx)
+  let params = conv.parameters()
+  let grad_w = params[0].get_grad()
+  let grad_b = params[1].get_grad()
+  assert_true((grad_w.get([0, 0, 0, 0]) - 10.0).abs() < 1.0e-9)
+  assert_true((grad_b.get([0]) - 4.0).abs() < 1.0e-9)
+  let gx = x.grad()
+  assert_true((gx.get([0, 0, 0, 0]) - 2.0).abs() < 1.0e-9)
+  assert_true((gx.get([0, 0, 1, 1]) - 2.0).abs() < 1.0e-9)
+}
+
+///|
 test "autotensor operators" {
   let a = AutoTensor::new(@math.Tensor::from_vector(@math.Vector::new([2.0])))
   let b = a.from_other(@math.Tensor::from_vector(@math.Vector::new([3.0])))
