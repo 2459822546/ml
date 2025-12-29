@@ -1283,6 +1283,44 @@ pub fn AutoTensor::softmax_cross_entropy(
 }
 
 ///|
+pub fn AutoTensor::cross_entropy(
+  self : AutoTensor,
+  y_true : Array[Int],
+) -> AutoTensor {
+  self.softmax_cross_entropy(y_true)
+}
+
+///|
+pub fn AutoTensor::nll_loss(
+  self : AutoTensor,
+  y_true : Array[Int],
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.nll_loss(self.id, y_true)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::mse_loss(
+  self : AutoTensor,
+  target : AutoTensor,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.mse_loss(self.id, target.id)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::mae_loss(
+  self : AutoTensor,
+  target : AutoTensor,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.mae_loss(self.id, target.id)
+  { graph: g, id }
+}
+
+///|
 pub fn AutoTensor::log_softmax(
   self : AutoTensor,
   axis? : Int = 1,
