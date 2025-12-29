@@ -750,6 +750,70 @@ pub fn BatchNorm2dModule::parameters(
 }
 
 ///|
+pub struct MaxPool2dModule {
+  kernel_size : Int
+  stride : Int
+}
+
+///|
+pub fn MaxPool2dModule::new(
+  kernel_size : Int,
+  stride? : Int = 0,
+) -> MaxPool2dModule {
+  let pool = MaxPool2d::new(kernel_size, stride~)
+  { kernel_size: pool.kernel_size, stride: pool.stride }
+}
+
+///|
+pub fn MaxPool2dModule::forward(
+  self : MaxPool2dModule,
+  x : AutoTensor,
+) -> AutoTensor {
+  x.maxpool2d(self.kernel_size, self.stride)
+}
+
+///|
+pub struct AvgPool2dModule {
+  kernel_size : Int
+  stride : Int
+}
+
+///|
+pub fn AvgPool2dModule::new(
+  kernel_size : Int,
+  stride? : Int = 0,
+) -> AvgPool2dModule {
+  let pool = AvgPool2d::new(kernel_size, stride~)
+  { kernel_size: pool.kernel_size, stride: pool.stride }
+}
+
+///|
+pub fn AvgPool2dModule::forward(
+  self : AvgPool2dModule,
+  x : AutoTensor,
+) -> AutoTensor {
+  x.avgpool2d(self.kernel_size, self.stride)
+}
+
+///|
+pub struct Flatten2dModule {
+  dummy : Int
+}
+
+///|
+pub fn Flatten2dModule::new() -> Flatten2dModule {
+  { dummy: 0 }
+}
+
+///|
+pub fn Flatten2dModule::forward(
+  _self : Flatten2dModule,
+  x : AutoTensor,
+) -> AutoTensor {
+  x.flatten2d()
+}
+
+///|
 pub enum Module {
   Linear(LinearModule)
   Relu
@@ -760,6 +824,9 @@ pub enum Module {
   LayerNorm(LayerNormModule)
   Embedding(EmbeddingModule)
   Conv2d(Conv2dModule)
+  MaxPool2d(MaxPool2dModule)
+  AvgPool2d(AvgPool2dModule)
+  Flatten2d(Flatten2dModule)
   Sequential(Sequential)
   ModuleList(ModuleList)
 }
@@ -812,6 +879,21 @@ pub fn module_embedding_module(e : EmbeddingModule) -> Module {
 ///|
 pub fn module_conv2d(m : Conv2dModule) -> Module {
   Conv2d(m)
+}
+
+///|
+pub fn module_maxpool2d(m : MaxPool2dModule) -> Module {
+  MaxPool2d(m)
+}
+
+///|
+pub fn module_avgpool2d(m : AvgPool2dModule) -> Module {
+  AvgPool2d(m)
+}
+
+///|
+pub fn module_flatten2d(m : Flatten2dModule) -> Module {
+  Flatten2d(m)
 }
 
 ///|
@@ -878,6 +960,9 @@ pub fn module_forward(
       let (y, ctx) = m.forward(x)
       (y, ModuleContext::Conv2d(ctx))
     }
+    MaxPool2d(m) => (m.forward(x), ModuleContext::None)
+    AvgPool2d(m) => (m.forward(x), ModuleContext::None)
+    Flatten2d(m) => (m.forward(x), ModuleContext::None)
     Sequential(s) => {
       let seq = s
       seq.train = train

@@ -700,3 +700,105 @@ pub fn Dropout2d::forward(
   self.seed = rng
   out
 }
+
+///|
+/// MaxPool2d
+pub struct MaxPool2d {
+  kernel_size : Int
+  stride : Int
+}
+
+///|
+pub fn MaxPool2d::new(kernel_size : Int, stride? : Int = 0) -> MaxPool2d {
+  if kernel_size <= 0 {
+    abort("kernel_size 必须大于 0")
+  }
+  let s = if stride == 0 { kernel_size } else { stride }
+  { kernel_size, stride: s }
+}
+
+///|
+pub fn MaxPool2d::forward(self : MaxPool2d, x : @math.Tensor) -> @math.Tensor {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("maxpool2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let out_h = (h - self.kernel_size) / self.stride + 1
+  let out_w = (w - self.kernel_size) / self.stride + 1
+  let out = @math.Tensor::zeros([n, c, out_h, out_w])
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      for oh = 0; oh < out_h; oh = oh + 1 {
+        for ow = 0; ow < out_w; ow = ow + 1 {
+          let mut max_v = -@double.infinity
+          for khi = 0; khi < self.kernel_size; khi = khi + 1 {
+            for kwi = 0; kwi < self.kernel_size; kwi = kwi + 1 {
+              let ih = oh * self.stride + khi
+              let iw = ow * self.stride + kwi
+              let v = x.get([ni, ci, ih, iw])
+              if v > max_v {
+                max_v = v
+              }
+            }
+          }
+          out.set([ni, ci, oh, ow], max_v)
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
+/// AvgPool2d
+pub struct AvgPool2d {
+  kernel_size : Int
+  stride : Int
+}
+
+///|
+pub fn AvgPool2d::new(kernel_size : Int, stride? : Int = 0) -> AvgPool2d {
+  if kernel_size <= 0 {
+    abort("kernel_size 必须大于 0")
+  }
+  let s = if stride == 0 { kernel_size } else { stride }
+  { kernel_size, stride: s }
+}
+
+///|
+pub fn AvgPool2d::forward(self : AvgPool2d, x : @math.Tensor) -> @math.Tensor {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("avgpool2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let out_h = (h - self.kernel_size) / self.stride + 1
+  let out_w = (w - self.kernel_size) / self.stride + 1
+  let out = @math.Tensor::zeros([n, c, out_h, out_w])
+  let denom = (self.kernel_size * self.kernel_size).to_double()
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      for oh = 0; oh < out_h; oh = oh + 1 {
+        for ow = 0; ow < out_w; ow = ow + 1 {
+          let mut sum = 0.0
+          for khi = 0; khi < self.kernel_size; khi = khi + 1 {
+            for kwi = 0; kwi < self.kernel_size; kwi = kwi + 1 {
+              let ih = oh * self.stride + khi
+              let iw = ow * self.stride + kwi
+              sum = sum + x.get([ni, ci, ih, iw])
+            }
+          }
+          out.set([ni, ci, oh, ow], sum / denom)
+        }
+      }
+    }
+  }
+  out
+}
