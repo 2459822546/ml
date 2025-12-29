@@ -1896,6 +1896,113 @@ pub fn ComputationGraph::softmax_cross_entropy(
 }
 
 ///|
+pub fn ComputationGraph::nll_loss(
+  self : ComputationGraph,
+  log_probs : Int,
+  labels : Array[Int],
+) -> Int {
+  let v = self.nodes[log_probs].value
+  let shape = v.get_shape()
+  if shape.length() != 2 {
+    abort("nll_loss 仅支持 2D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  if labels.length() != n {
+    abort("标签长度不匹配")
+  }
+  let mut loss = 0.0
+  for i = 0; i < n; i = i + 1 {
+    let cls = labels[i]
+    if cls < 0 || cls >= c {
+      abort("类别索引越界")
+    }
+    loss = loss - v.get([i, cls])
+  }
+  let loss_val = loss / n.to_double()
+  let out = @math.Tensor::new([loss_val], [1])
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: NLLLoss,
+    parents: [log_probs],
+    requires_grad: true,
+    aux_tensors: [labels_to_tensor(labels)],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::mse_loss(
+  self : ComputationGraph,
+  pred : Int,
+  target : Int,
+) -> Int {
+  let vp = self.nodes[pred].value
+  let vt = self.nodes[target].value
+  let diff = tensor_sub(vp, vt)
+  let shape = diff.get_shape()
+  let strides = compute_strides(shape)
+  let total = diff.total_size()
+  let mut sum = 0.0
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    let v = diff.get(idx)
+    sum = sum + v * v
+  }
+  let loss_val = sum / total.to_double()
+  let out = @math.Tensor::new([loss_val], [1])
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: MSELoss,
+    parents: [pred, target],
+    requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::mae_loss(
+  self : ComputationGraph,
+  pred : Int,
+  target : Int,
+) -> Int {
+  let vp = self.nodes[pred].value
+  let vt = self.nodes[target].value
+  let diff = tensor_sub(vp, vt)
+  let shape = diff.get_shape()
+  let strides = compute_strides(shape)
+  let total = diff.total_size()
+  let mut sum = 0.0
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    sum = sum + diff.get(idx).abs()
+  }
+  let loss_val = sum / total.to_double()
+  let out = @math.Tensor::new([loss_val], [1])
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: MAELoss,
+    parents: [pred, target],
+    requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
 fn topo_collect(
   g : ComputationGraph,
   root : Int,
