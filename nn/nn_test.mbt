@@ -446,6 +446,24 @@ test "train and eval step" {
 }
 
 ///|
+test "train step batch from dataloader" {
+  let linear = LinearModule::new(2, 2, seed=3)
+  let seq = Sequential::new([module_linear(linear)])
+  let features = [[1.0, 0.0], [0.0, 1.0]]
+  let labels = [0.0, 1.0]
+  let ds = @data.Dataset::new(features, labels)
+  let loader = @data.DataLoader::new(ds, batch_size=2, shuffle=false)
+  let opt = optimizer_params_sgd(seq.parameters(), 0.1)
+  match loader.next_batch_pack() {
+    Some(batch) => {
+      let (_loss, _opt2) = train_step_batch(seq, batch, opt)
+      ()
+    }
+    None => abort("no batch")
+  }
+}
+
+///|
 test "mlp forward logits" {
   let mlp = MLP::new(2, [3], 2, output_activation=act_softmax(), seed=1)
   let x = @math.Matrix::new([[0.0, 0.0], [1.0, 1.0]])
