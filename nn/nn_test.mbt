@@ -420,6 +420,20 @@ test "named parameters and buffers" {
     Some(_) => ()
     None => abort("缺少 1.running_var")
   }
+  let param_list = seq.named_parameters_list()
+  assert_eq(param_list[0].0, "0.weight")
+  assert_eq(param_list[1].0, "0.bias")
+  assert_eq(param_list[2].0, "1.gamma")
+  assert_eq(param_list[3].0, "1.beta")
+  let params_order = seq.parameters()
+  assert_eq(param_list.length(), params_order.length())
+  assert_eq(params_order[0].get_data().get_shape(), [2, 1])
+  assert_eq(params_order[1].get_data().get_shape(), [1])
+  assert_eq(params_order[2].get_data().get_shape(), [1])
+  assert_eq(params_order[3].get_data().get_shape(), [1])
+  let buffers_list = seq.named_buffers_list()
+  assert_eq(buffers_list[0].0, "1.running_mean")
+  assert_eq(buffers_list[1].0, "1.running_var")
 }
 
 ///|
