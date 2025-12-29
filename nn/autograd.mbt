@@ -99,6 +99,10 @@ fn tensor_add_inplace(dst : @math.Tensor, src : @math.Tensor) -> Unit {
   if shape != src.get_shape() {
     abort("张量形状不一致")
   }
+  if not(@math.dtype_eq(dst.get_dtype(), src.get_dtype())) ||
+    not(@math.device_eq(dst.get_device(), src.get_device())) {
+    abort("张量 dtype 或 device 不一致")
+  }
   let strides = compute_strides(shape)
   let total = dst.total_size()
   for i = 0; i < total; i = i + 1 {
@@ -108,7 +112,25 @@ fn tensor_add_inplace(dst : @math.Tensor, src : @math.Tensor) -> Unit {
 }
 
 ///|
+fn tensor_assert_compatible(a : @math.Tensor, b : @math.Tensor) -> Unit {
+  if not(@math.dtype_eq(a.get_dtype(), b.get_dtype())) ||
+    not(@math.device_eq(a.get_device(), b.get_device())) {
+    abort("张量 dtype 或 device 不一致")
+  }
+}
+
+///|
+fn tensor_new_like(
+  base : @math.Tensor,
+  data : Array[Double],
+  shape : Array[Int],
+) -> @math.Tensor {
+  @math.Tensor::new_with_meta(data, shape, base.get_dtype(), base.get_device())
+}
+
+///|
 fn tensor_hadamard(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  tensor_assert_compatible(a, b)
   let shape = a.get_shape()
   if shape != b.get_shape() {
     abort("张量形状不一致")
@@ -120,11 +142,12 @@ fn tensor_hadamard(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
     let idx = indices_from_flat(shape, strides, i)
     data[i] = a.get(idx) * b.get(idx)
   }
-  @math.Tensor::new(data, shape)
+  tensor_new_like(a, data, shape)
 }
 
 ///|
 fn tensor_add(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  tensor_assert_compatible(a, b)
   let shape_a = a.get_shape()
   let shape_b = b.get_shape()
   let out_shape = broadcast_shape(shape_a, shape_b)
@@ -137,7 +160,7 @@ fn tensor_add(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
     let b_idx = broadcast_indices(out_idx, out_shape, shape_b)
     data[i] = a.get(a_idx) + b.get(b_idx)
   }
-  @math.Tensor::new(data, out_shape)
+  tensor_new_like(a, data, out_shape)
 }
 
 ///|
@@ -150,7 +173,7 @@ fn tensor_neg(t : @math.Tensor) -> @math.Tensor {
     let idx = indices_from_flat(shape, strides, i)
     data[i] = -t.get(idx)
   }
-  @math.Tensor::new(data, shape)
+  tensor_new_like(t, data, shape)
 }
 
 ///|
@@ -164,17 +187,27 @@ fn tensor_mask_relu(t : @math.Tensor) -> @math.Tensor {
     let v = t.get(idx)
     data[i] = if v > 0.0 { 1.0 } else { 0.0 }
   }
-  @math.Tensor::new(data, shape)
+  tensor_new_like(t, data, shape)
 }
 
 ///|
 fn tensor_ones_like(t : @math.Tensor) -> @math.Tensor {
-  @math.Tensor::fill(t.get_shape(), 1.0)
+  @math.Tensor::fill_with_meta(
+    t.get_shape(),
+    1.0,
+    t.get_dtype(),
+    t.get_device(),
+  )
 }
 
 ///|
 fn tensor_zeros_like(t : @math.Tensor) -> @math.Tensor {
-  @math.Tensor::zeros(t.get_shape())
+  @math.Tensor::fill_with_meta(
+    t.get_shape(),
+    0.0,
+    t.get_dtype(),
+    t.get_device(),
+  )
 }
 
 ///|
@@ -183,7 +216,12 @@ fn tensor_shape_to_tensor(shape : Array[Int]) -> @math.Tensor {
   for i = 0; i < shape.length(); i = i + 1 {
     data[i] = shape[i].to_double()
   }
-  @math.Tensor::new(data, [shape.length()])
+  @math.Tensor::new_with_meta(
+    data,
+    [shape.length()],
+    @math.DType::Float64,
+    @math.Device::CPU,
+  )
 }
 
 ///|
@@ -222,7 +260,7 @@ fn tensor_reshape(t : @math.Tensor, shape : Array[Int]) -> @math.Tensor {
   if total != t.total_size() {
     abort("reshape 总元素数量不匹配")
   }
-  @math.Tensor::new(tensor_flatten_data(t), shape)
+  tensor_new_like(t, tensor_flatten_data(t), shape)
 }
 
 ///|
@@ -235,11 +273,12 @@ fn tensor_scale(t : @math.Tensor, scalar : Double) -> @math.Tensor {
     let idx = indices_from_flat(shape, strides, i)
     data[i] = t.get(idx) * scalar
   }
-  @math.Tensor::new(data, shape)
+  tensor_new_like(t, data, shape)
 }
 
 ///|
 fn tensor_sub(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  tensor_assert_compatible(a, b)
   let shape_a = a.get_shape()
   let shape_b = b.get_shape()
   let out_shape = broadcast_shape(shape_a, shape_b)
@@ -252,11 +291,12 @@ fn tensor_sub(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
     let b_idx = broadcast_indices(out_idx, out_shape, shape_b)
     data[i] = a.get(a_idx) - b.get(b_idx)
   }
-  @math.Tensor::new(data, out_shape)
+  tensor_new_like(a, data, out_shape)
 }
 
 ///|
 fn tensor_mul(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  tensor_assert_compatible(a, b)
   let shape_a = a.get_shape()
   let shape_b = b.get_shape()
   let out_shape = broadcast_shape(shape_a, shape_b)
@@ -269,7 +309,7 @@ fn tensor_mul(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
     let b_idx = broadcast_indices(out_idx, out_shape, shape_b)
     data[i] = a.get(a_idx) * b.get(b_idx)
   }
-  @math.Tensor::new(data, out_shape)
+  tensor_new_like(a, data, out_shape)
 }
 
 ///|
@@ -279,6 +319,7 @@ fn tensor_transpose(t : @math.Tensor, axes : Array[Int]) -> @math.Tensor {
 
 ///|
 fn tensor_matmul(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  tensor_assert_compatible(a, b)
   let shape_a = a.get_shape()
   let shape_b = b.get_shape()
   if shape_a.length() != 2 || shape_b.length() != 2 {
@@ -303,11 +344,12 @@ fn tensor_matmul(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
       idx = idx + 1
     }
   }
-  @math.Tensor::new(data, [m, n])
+  tensor_new_like(a, data, [m, n])
 }
 
 ///|
 fn tensor_add_bias(x : @math.Tensor, bias : @math.Tensor) -> @math.Tensor {
+  tensor_assert_compatible(x, bias)
   let shape_x = x.get_shape()
   let shape_b = bias.get_shape()
   if shape_x.length() != 2 || shape_b.length() != 1 {
@@ -326,7 +368,7 @@ fn tensor_add_bias(x : @math.Tensor, bias : @math.Tensor) -> @math.Tensor {
       idx = idx + 1
     }
   }
-  @math.Tensor::new(data, [n, m])
+  tensor_new_like(x, data, [n, m])
 }
 
 ///|
@@ -339,7 +381,7 @@ fn tensor_sum_all(x : @math.Tensor) -> @math.Tensor {
     let idx = indices_from_flat(shape, strides, i)
     sum = sum + x.get(idx)
   }
-  @math.Tensor::new([sum], [1])
+  tensor_new_like(x, [sum], [1])
 }
 
 ///|
@@ -395,12 +437,17 @@ fn tensor_reduce_to_shape(
 ) -> @math.Tensor {
   let grad_shape = grad.get_shape()
   if grad_shape == shape {
-    return @math.Tensor::new(tensor_flatten_data(grad), shape)
+    return tensor_new_like(grad, tensor_flatten_data(grad), shape)
   }
   if grad_shape.length() < shape.length() {
     abort("reduce 目标形状不合法")
   }
-  let out = @math.Tensor::zeros(shape)
+  let out = @math.Tensor::fill_with_meta(
+    shape,
+    0.0,
+    grad.get_dtype(),
+    grad.get_device(),
+  )
   let grad_strides = compute_strides(grad_shape)
   let total = grad.total_size()
   let offset = grad_shape.length() - shape.length()
@@ -432,7 +479,7 @@ fn tensor_broadcast_to(x : @math.Tensor, shape : Array[Int]) -> @math.Tensor {
     let in_idx = broadcast_indices(out_idx, out_shape, in_shape)
     data[i] = x.get(in_idx)
   }
-  @math.Tensor::new(data, out_shape)
+  tensor_new_like(x, data, out_shape)
 }
 
 ///|
@@ -461,7 +508,7 @@ fn tensor_sum_axes(
   keepdim? : Bool = false,
 ) -> @math.Tensor {
   if axes.length() == 0 {
-    return @math.Tensor::new(tensor_flatten_data(x), x.get_shape())
+    return tensor_new_like(x, tensor_flatten_data(x), x.get_shape())
   }
   let shape = x.get_shape()
   let ndim = shape.length()
@@ -523,7 +570,7 @@ fn tensor_sum_axes(
     }
     data[out_idx] = data[out_idx] + x.get(coords)
   }
-  @math.Tensor::new(data, out_shape)
+  tensor_new_like(x, data, out_shape)
 }
 
 ///|
@@ -533,7 +580,7 @@ fn tensor_mean_axes(
   keepdim? : Bool = false,
 ) -> @math.Tensor {
   if axes.length() == 0 {
-    return @math.Tensor::new(tensor_flatten_data(x), x.get_shape())
+    return tensor_new_like(x, tensor_flatten_data(x), x.get_shape())
   }
   let mut denom = 1.0
   let shape = x.get_shape()
@@ -642,7 +689,7 @@ fn tensor_logsumexp_axis(
   for i = 0; i < out_size; i = i + 1 {
     out_data[i] = @moonbitlang/core/math.ln(sum_data[i]) + max_data[i]
   }
-  @math.Tensor::new(out_data, out_shape)
+  tensor_new_like(x, out_data, out_shape)
 }
 
 ///|
@@ -655,7 +702,7 @@ fn tensor_exp(x : @math.Tensor) -> @math.Tensor {
     let idx = indices_from_flat(shape, strides, i)
     data[i] = @moonbitlang/core/math.exp(x.get(idx))
   }
-  @math.Tensor::new(data, shape)
+  tensor_new_like(x, data, shape)
 }
 
 ///|
@@ -669,7 +716,7 @@ fn tensor_sign(x : @math.Tensor) -> @math.Tensor {
     let v = x.get(idx)
     data[i] = if v > 0.0 { 1.0 } else if v < 0.0 { -1.0 } else { 0.0 }
   }
-  @math.Tensor::new(data, shape)
+  tensor_new_like(x, data, shape)
 }
 
 ///|
@@ -699,7 +746,7 @@ fn tensor_dropout(
       mask[i] = 0.0
     }
   }
-  (@math.Tensor::new(data, shape), @math.Tensor::new(mask, shape), rng)
+  (tensor_new_like(x, data, shape), tensor_new_like(x, mask, shape), rng)
 }
 
 ///|
@@ -742,7 +789,7 @@ fn tensor_dropout2d(
       }
     }
   }
-  (@math.Tensor::new(data, shape), @math.Tensor::new(mask, shape), rng)
+  (tensor_new_like(x, data, shape), tensor_new_like(x, mask, shape), rng)
 }
 
 ///|
@@ -752,6 +799,8 @@ fn tensor_layernorm_forward(
   beta : @math.Tensor,
   eps : Double,
 ) -> (@math.Tensor, @math.Tensor, @math.Tensor) {
+  tensor_assert_compatible(x, gamma)
+  tensor_assert_compatible(x, beta)
   let shape = x.get_shape()
   if shape.length() != 2 {
     abort("layernorm 仅支持 2D 张量")
@@ -787,9 +836,9 @@ fn tensor_layernorm_forward(
     }
   }
   (
-    @math.Tensor::new(data, [n, m]),
-    @math.Tensor::new(mean, [n]),
-    @math.Tensor::new(variance, [n]),
+    tensor_new_like(x, data, [n, m]),
+    tensor_new_like(x, mean, [n]),
+    tensor_new_like(x, variance, [n]),
   )
 }
 
@@ -801,6 +850,8 @@ fn tensor_conv2d(
   stride : Int,
   padding : Int,
 ) -> @math.Tensor {
+  tensor_assert_compatible(x, w)
+  tensor_assert_compatible(x, b)
   let shape_x = x.get_shape()
   let shape_w = w.get_shape()
   if shape_x.length() != 4 || shape_w.length() != 4 {
@@ -822,7 +873,12 @@ fn tensor_conv2d(
   }
   let out_h = (h + 2 * padding - kh) / stride + 1
   let out_w = (wi + 2 * padding - kw) / stride + 1
-  let out = @math.Tensor::zeros([n, cout, out_h, out_w])
+  let out = @math.Tensor::fill_with_meta(
+    [n, cout, out_h, out_w],
+    0.0,
+    x.get_dtype(),
+    x.get_device(),
+  )
   for ni = 0; ni < n; ni = ni + 1 {
     for co = 0; co < cout; co = co + 1 {
       for oh = 0; oh < out_h; oh = oh + 1 {
@@ -864,9 +920,24 @@ fn tensor_maxpool2d(
   let w = shape[3]
   let out_h = (h - kernel) / stride + 1
   let out_w = (w - kernel) / stride + 1
-  let out = @math.Tensor::zeros([n, c, out_h, out_w])
-  let idx_h = @math.Tensor::zeros([n, c, out_h, out_w])
-  let idx_w = @math.Tensor::zeros([n, c, out_h, out_w])
+  let out = @math.Tensor::fill_with_meta(
+    [n, c, out_h, out_w],
+    0.0,
+    x.get_dtype(),
+    x.get_device(),
+  )
+  let idx_h = @math.Tensor::fill_with_meta(
+    [n, c, out_h, out_w],
+    0.0,
+    x.get_dtype(),
+    x.get_device(),
+  )
+  let idx_w = @math.Tensor::fill_with_meta(
+    [n, c, out_h, out_w],
+    0.0,
+    x.get_dtype(),
+    x.get_device(),
+  )
   for ni = 0; ni < n; ni = ni + 1 {
     for ci = 0; ci < c; ci = ci + 1 {
       for oh = 0; oh < out_h; oh = oh + 1 {
@@ -912,7 +983,12 @@ fn tensor_avgpool2d(
   let w = shape[3]
   let out_h = (h - kernel) / stride + 1
   let out_w = (w - kernel) / stride + 1
-  let out = @math.Tensor::zeros([n, c, out_h, out_w])
+  let out = @math.Tensor::fill_with_meta(
+    [n, c, out_h, out_w],
+    0.0,
+    x.get_dtype(),
+    x.get_device(),
+  )
   let denom = (kernel * kernel).to_double()
   for ni = 0; ni < n; ni = ni + 1 {
     for ci = 0; ci < c; ci = ci + 1 {
@@ -983,7 +1059,10 @@ fn tensor_softmax_cross_entropy(
     loss = loss - logprob
   }
   let loss_val = loss / n.to_double()
-  (@math.Tensor::new([loss_val], [1]), @math.Tensor::new(probs_data, [n, c]))
+  (
+    tensor_new_like(logits, [loss_val], [1]),
+    tensor_new_like(logits, probs_data, [n, c]),
+  )
 }
 
 ///|
@@ -992,7 +1071,12 @@ fn labels_to_tensor(labels : Array[Int]) -> @math.Tensor {
   for i = 0; i < labels.length(); i = i + 1 {
     data[i] = labels[i].to_double()
   }
-  @math.Tensor::new(data, [labels.length()])
+  @math.Tensor::new_with_meta(
+    data,
+    [labels.length()],
+    @math.DType::Float64,
+    @math.Device::CPU,
+  )
 }
 
 ///|
@@ -1506,7 +1590,7 @@ pub fn ComputationGraph::relu(self : ComputationGraph, a : Int) -> Int {
     let v = va.get(idx)
     data[i] = if v > 0.0 { v } else { 0.0 }
   }
-  let out = @math.Tensor::new(data, shape)
+  let out = tensor_new_like(va, data, shape)
   self.record_op(out, Relu, [a], [], [], false)
 }
 
@@ -1678,6 +1762,7 @@ pub fn ComputationGraph::embedding(
   indices : @math.Tensor,
 ) -> Int {
   let w = self.nodes[weight].value
+  tensor_assert_compatible(w, indices)
   let shape_w = w.get_shape()
   if shape_w.length() != 2 {
     abort("embedding 权重需要 2D 张量")
@@ -1696,7 +1781,7 @@ pub fn ComputationGraph::embedding(
       idx = idx + 1
     }
   }
-  let out = @math.Tensor::new(data, [n, dim])
+  let out = tensor_new_like(w, data, [n, dim])
   self.record_op(out, Embedding, [weight], [indices], [], false)
 }
 
@@ -1880,7 +1965,7 @@ pub fn ComputationGraph::nll_loss(
     loss = loss - v.get([i, cls])
   }
   let loss_val = loss / n.to_double()
-  let out = @math.Tensor::new([loss_val], [1])
+  let out = tensor_new_like(v, [loss_val], [1])
   self.record_op(
     out,
     NLLLoss,
@@ -1910,7 +1995,7 @@ pub fn ComputationGraph::mse_loss(
     sum = sum + v * v
   }
   let loss_val = sum / total.to_double()
-  let out = @math.Tensor::new([loss_val], [1])
+  let out = tensor_new_like(vp, [loss_val], [1])
   self.record_op(out, MSELoss, [pred, target], [], [], false)
 }
 
@@ -1932,7 +2017,7 @@ pub fn ComputationGraph::mae_loss(
     sum = sum + diff.get(idx).abs()
   }
   let loss_val = sum / total.to_double()
-  let out = @math.Tensor::new([loss_val], [1])
+  let out = tensor_new_like(vp, [loss_val], [1])
   self.record_op(out, MAELoss, [pred, target], [], [], false)
 }
 
@@ -2040,8 +2125,18 @@ pub fn ComputationGraph::backward_with_grad(
         let m = shape_a[0]
         let k = shape_a[1]
         let n = shape_b[1]
-        let grad_a = @math.Tensor::zeros([m, k])
-        let grad_b = @math.Tensor::zeros([k, n])
+        let grad_a = @math.Tensor::fill_with_meta(
+          [m, k],
+          0.0,
+          a.get_dtype(),
+          a.get_device(),
+        )
+        let grad_b = @math.Tensor::fill_with_meta(
+          [k, n],
+          0.0,
+          b.get_dtype(),
+          b.get_device(),
+        )
         for i = 0; i < m; i = i + 1 {
           for j = 0; j < n; j = j + 1 {
             let gij = g.get([i, j])
@@ -2062,7 +2157,13 @@ pub fn ComputationGraph::backward_with_grad(
         let shape_g = g.get_shape()
         let n = shape_g[0]
         let m = shape_g[1]
-        let grad_b = @math.Tensor::zeros([m])
+        let bias = self.nodes[p1].value
+        let grad_b = @math.Tensor::fill_with_meta(
+          [m],
+          0.0,
+          bias.get_dtype(),
+          bias.get_device(),
+        )
         for i = 0; i < n; i = i + 1 {
           for j = 0; j < m; j = j + 1 {
             grad_b.set([j], grad_b.get([j]) + g.get([i, j]))
@@ -2125,9 +2226,25 @@ pub fn ComputationGraph::backward_with_grad(
         let mean = node.aux_tensors[0]
         let variance = node.aux_tensors[1]
         let eps = node.aux_scalars[0]
-        let grad_x = @math.Tensor::zeros([n, m])
-        let grad_gamma = @math.Tensor::zeros([m])
-        let grad_beta = @math.Tensor::zeros([m])
+        let grad_x = @math.Tensor::fill_with_meta(
+          [n, m],
+          0.0,
+          x.get_dtype(),
+          x.get_device(),
+        )
+        let grad_gamma = @math.Tensor::fill_with_meta(
+          [m],
+          0.0,
+          gamma.get_dtype(),
+          gamma.get_device(),
+        )
+        let beta = self.nodes[p2].value
+        let grad_beta = @math.Tensor::fill_with_meta(
+          [m],
+          0.0,
+          beta.get_dtype(),
+          beta.get_device(),
+        )
         for j = 0; j < m; j = j + 1 {
           let mean_j = mean.get([j])
           let var_j = variance.get([j])
@@ -2200,9 +2317,25 @@ pub fn ComputationGraph::backward_with_grad(
         let mean = node.aux_tensors[0]
         let variance = node.aux_tensors[1]
         let eps = node.aux_scalars[0]
-        let grad_x = @math.Tensor::zeros([n, c, h, w])
-        let grad_gamma = @math.Tensor::zeros([c])
-        let grad_beta = @math.Tensor::zeros([c])
+        let grad_x = @math.Tensor::fill_with_meta(
+          [n, c, h, w],
+          0.0,
+          x.get_dtype(),
+          x.get_device(),
+        )
+        let grad_gamma = @math.Tensor::fill_with_meta(
+          [c],
+          0.0,
+          gamma.get_dtype(),
+          gamma.get_device(),
+        )
+        let beta = self.nodes[p2].value
+        let grad_beta = @math.Tensor::fill_with_meta(
+          [c],
+          0.0,
+          beta.get_dtype(),
+          beta.get_device(),
+        )
         let nhw = (n * h * w).to_double()
         for ci = 0; ci < c; ci = ci + 1 {
           let mean_c = mean.get([ci])
@@ -2264,9 +2397,25 @@ pub fn ComputationGraph::backward_with_grad(
         let mean = node.aux_tensors[0]
         let variance = node.aux_tensors[1]
         let eps = node.aux_scalars[0]
-        let grad_x = @math.Tensor::zeros([n, m])
-        let grad_gamma = @math.Tensor::zeros([m])
-        let grad_beta = @math.Tensor::zeros([m])
+        let grad_x = @math.Tensor::fill_with_meta(
+          [n, m],
+          0.0,
+          x.get_dtype(),
+          x.get_device(),
+        )
+        let grad_gamma = @math.Tensor::fill_with_meta(
+          [m],
+          0.0,
+          gamma.get_dtype(),
+          gamma.get_device(),
+        )
+        let beta = self.nodes[p2].value
+        let grad_beta = @math.Tensor::fill_with_meta(
+          [m],
+          0.0,
+          beta.get_dtype(),
+          beta.get_device(),
+        )
         for i = 0; i < n; i = i + 1 {
           let mean_i = mean.get([i])
           let var_i = variance.get([i])
@@ -2316,7 +2465,12 @@ pub fn ComputationGraph::backward_with_grad(
         let indices = node.aux_tensors[0]
         let n = indices.total_size()
         let dim = shape_w[1]
-        let grad_w = @math.Tensor::zeros([shape_w[0], dim])
+        let grad_w = @math.Tensor::fill_with_meta(
+          [shape_w[0], dim],
+          0.0,
+          w.get_dtype(),
+          w.get_device(),
+        )
         for i = 0; i < n; i = i + 1 {
           let row = indices.get([i]).to_int()
           for j = 0; j < dim; j = j + 1 {
@@ -2346,9 +2500,25 @@ pub fn ComputationGraph::backward_with_grad(
         let out_w = shape_g[3]
         let stride = node.aux_scalars[0].to_int()
         let padding = node.aux_scalars[1].to_int()
-        let grad_x = @math.Tensor::zeros([n, cin, h, wi])
-        let grad_w = @math.Tensor::zeros([cout, cin, kh, kw])
-        let grad_b = @math.Tensor::zeros([cout])
+        let grad_x = @math.Tensor::fill_with_meta(
+          [n, cin, h, wi],
+          0.0,
+          x.get_dtype(),
+          x.get_device(),
+        )
+        let grad_w = @math.Tensor::fill_with_meta(
+          [cout, cin, kh, kw],
+          0.0,
+          w.get_dtype(),
+          w.get_device(),
+        )
+        let b = self.nodes[p2].value
+        let grad_b = @math.Tensor::fill_with_meta(
+          [cout],
+          0.0,
+          b.get_dtype(),
+          b.get_device(),
+        )
         for ni = 0; ni < n; ni = ni + 1 {
           for co = 0; co < cout; co = co + 1 {
             for oh = 0; oh < out_h; oh = oh + 1 {
@@ -2395,7 +2565,12 @@ pub fn ComputationGraph::backward_with_grad(
         let out_w = out_shape[3]
         let idx_h = node.aux_tensors[0]
         let idx_w = node.aux_tensors[1]
-        let grad_x = @math.Tensor::zeros(shape)
+        let grad_x = @math.Tensor::fill_with_meta(
+          shape,
+          0.0,
+          x.get_dtype(),
+          x.get_device(),
+        )
         for ni = 0; ni < n; ni = ni + 1 {
           for ci = 0; ci < c; ci = ci + 1 {
             for oh = 0; oh < out_h; oh = oh + 1 {
@@ -2426,7 +2601,12 @@ pub fn ComputationGraph::backward_with_grad(
         let out_w = out_shape[3]
         let kernel = node.aux_scalars[0].to_int()
         let stride = node.aux_scalars[1].to_int()
-        let grad_x = @math.Tensor::zeros([n, c, h, w])
+        let grad_x = @math.Tensor::fill_with_meta(
+          [n, c, h, w],
+          0.0,
+          x.get_dtype(),
+          x.get_device(),
+        )
         let scale = 1.0 / (kernel * kernel).to_double()
         for ni = 0; ni < n; ni = ni + 1 {
           for ci = 0; ci < c; ci = ci + 1 {
@@ -2465,7 +2645,12 @@ pub fn ComputationGraph::backward_with_grad(
         let shape = probs.get_shape()
         let n = shape[0]
         let c = shape[1]
-        let grad_logits = @math.Tensor::zeros([n, c])
+        let grad_logits = @math.Tensor::fill_with_meta(
+          [n, c],
+          0.0,
+          probs.get_dtype(),
+          probs.get_device(),
+        )
         let scale = g.get([0]) / n.to_double()
         for i = 0; i < n; i = i + 1 {
           let cls = labels.get([i]).to_int()
@@ -2484,7 +2669,13 @@ pub fn ComputationGraph::backward_with_grad(
         let shape = self.nodes[p].value.get_shape()
         let n = shape[0]
         let c = shape[1]
-        let grad_logp = @math.Tensor::zeros([n, c])
+        let logp = self.nodes[p].value
+        let grad_logp = @math.Tensor::fill_with_meta(
+          [n, c],
+          0.0,
+          logp.get_dtype(),
+          logp.get_device(),
+        )
         let scale = -g.get([0]) / n.to_double()
         for i = 0; i < n; i = i + 1 {
           let cls = labels.get([i]).to_int()
