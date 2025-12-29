@@ -115,6 +115,20 @@ fn optimizer_adamw(AdamW) -> Optimizer
 
 fn optimizer_get_lr(Optimizer) -> Double
 
+fn optimizer_params_adagrad(Array[Parameter], Double, eps? : Double) -> OptimizerParams
+
+fn optimizer_params_adam(Array[Parameter], Double, beta1? : Double, beta2? : Double, eps? : Double) -> OptimizerParams
+
+fn optimizer_params_adamw(Array[Parameter], Double, beta1? : Double, beta2? : Double, eps? : Double, weight_decay? : Double) -> OptimizerParams
+
+fn optimizer_params_rmsprop(Array[Parameter], Double, alpha? : Double, eps? : Double) -> OptimizerParams
+
+fn optimizer_params_sgd(Array[Parameter], Double, momentum? : Double, weight_decay? : Double) -> OptimizerParams
+
+fn optimizer_params_step(OptimizerParams) -> OptimizerParams
+
+fn optimizer_params_zero_grad(OptimizerParams) -> OptimizerParams
+
 fn optimizer_rmsprop(RMSProp) -> Optimizer
 
 fn optimizer_set_lr(Optimizer, Double) -> Optimizer
@@ -612,6 +626,14 @@ pub enum Optimizer {
   AdamW(AdamW)
   RMSProp(RMSProp)
   Adagrad(Adagrad)
+}
+
+pub enum OptimizerParams {
+  SGD(SGDParams, Array[Parameter])
+  Adam(AdamParams, Array[Parameter])
+  AdamW(AdamWParams, Array[Parameter])
+  RMSProp(RMSPropParams, Array[Parameter])
+  Adagrad(AdagradParams, Array[Parameter])
 }
 
 pub struct Parameter {

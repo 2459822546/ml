@@ -892,3 +892,135 @@ pub fn optimizer_get_lr(opt : Optimizer) -> Double {
     Adagrad(a) => a.get_lr()
   }
 }
+
+///|
+/// 统一 Parameter 优化器接口
+pub enum OptimizerParams {
+  SGD(SGDParams, Array[Parameter])
+  Adam(AdamParams, Array[Parameter])
+  AdamW(AdamWParams, Array[Parameter])
+  RMSProp(RMSPropParams, Array[Parameter])
+  Adagrad(AdagradParams, Array[Parameter])
+}
+
+///|
+pub fn optimizer_params_sgd(
+  params : Array[Parameter],
+  lr : Double,
+  momentum? : Double = 0.0,
+  weight_decay? : Double = 0.0,
+) -> OptimizerParams {
+  SGD(SGDParams::new(lr, params, momentum~, weight_decay~), params)
+}
+
+///|
+pub fn optimizer_params_adam(
+  params : Array[Parameter],
+  lr : Double,
+  beta1? : Double = 0.9,
+  beta2? : Double = 0.999,
+  eps? : Double = 1.0e-8,
+) -> OptimizerParams {
+  Adam(AdamParams::new(lr, params, beta1~, beta2~, eps~), params)
+}
+
+///|
+pub fn optimizer_params_adamw(
+  params : Array[Parameter],
+  lr : Double,
+  beta1? : Double = 0.9,
+  beta2? : Double = 0.999,
+  eps? : Double = 1.0e-8,
+  weight_decay? : Double = 0.0,
+) -> OptimizerParams {
+  AdamW(
+    AdamWParams::new(lr, params, beta1~, beta2~, eps~, weight_decay~),
+    params,
+  )
+}
+
+///|
+pub fn optimizer_params_rmsprop(
+  params : Array[Parameter],
+  lr : Double,
+  alpha? : Double = 0.99,
+  eps? : Double = 1.0e-8,
+) -> OptimizerParams {
+  RMSProp(RMSPropParams::new(lr, params, alpha~, eps~), params)
+}
+
+///|
+pub fn optimizer_params_adagrad(
+  params : Array[Parameter],
+  lr : Double,
+  eps? : Double = 1.0e-8,
+) -> OptimizerParams {
+  Adagrad(AdagradParams::new(lr, params, eps~), params)
+}
+
+///|
+pub fn optimizer_params_zero_grad(opt : OptimizerParams) -> OptimizerParams {
+  match opt {
+    SGD(s, params) => {
+      for i = 0; i < params.length(); i = i + 1 {
+        params[i].zero_grad()
+      }
+      SGD(s, params)
+    }
+    Adam(a, params) => {
+      for i = 0; i < params.length(); i = i + 1 {
+        params[i].zero_grad()
+      }
+      Adam(a, params)
+    }
+    AdamW(a, params) => {
+      for i = 0; i < params.length(); i = i + 1 {
+        params[i].zero_grad()
+      }
+      AdamW(a, params)
+    }
+    RMSProp(r, params) => {
+      for i = 0; i < params.length(); i = i + 1 {
+        params[i].zero_grad()
+      }
+      RMSProp(r, params)
+    }
+    Adagrad(a, params) => {
+      for i = 0; i < params.length(); i = i + 1 {
+        params[i].zero_grad()
+      }
+      Adagrad(a, params)
+    }
+  }
+}
+
+///|
+pub fn optimizer_params_step(opt : OptimizerParams) -> OptimizerParams {
+  match opt {
+    SGD(s, params) => {
+      let o = s
+      o.step(params)
+      SGD(o, params)
+    }
+    Adam(a, params) => {
+      let o = a
+      o.step(params)
+      Adam(o, params)
+    }
+    AdamW(a, params) => {
+      let o = a
+      o.step(params)
+      AdamW(o, params)
+    }
+    RMSProp(r, params) => {
+      let o = r
+      o.step(params)
+      RMSProp(o, params)
+    }
+    Adagrad(a, params) => {
+      let o = a
+      o.step(params)
+      Adagrad(o, params)
+    }
+  }
+}

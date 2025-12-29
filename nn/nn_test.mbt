@@ -349,6 +349,19 @@ test "optimizer params step" {
 }
 
 ///|
+test "optimizer params wrapper" {
+  let p = Parameter::new(@math.Tensor::new([1.0], [1]))
+  p.set_grad(@math.Tensor::new([0.1], [1]))
+  let opt = optimizer_params_sgd([p], 0.1)
+  let opt2 = optimizer_params_step(opt)
+  let v = p.get_data().get([0])
+  assert_true((v - 0.99).abs() < 1.0e-9)
+  let _ = optimizer_params_zero_grad(opt2)
+  let g = p.get_grad().get([0])
+  assert_true(g.abs() < 1.0e-9)
+}
+
+///|
 test "optimizer params step seq" {
   let linear = LinearModule::new(2, 1, seed=1)
   linear.set_params(
