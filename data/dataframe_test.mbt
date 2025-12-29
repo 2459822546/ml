@@ -78,3 +78,63 @@ test "DataFrame - 空 DataFrame" {
   assert_eq(df.n_rows(), 0)
   assert_eq(df.n_cols(), 2)
 }
+
+///|
+test "DataFrame - filter" {
+  let columns = ["A", "B"]
+  let data = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+  let df = DataFrame::new(columns, data)
+  let filtered = df.filter(fn(row) { row[0] > 2.0 })
+  assert_eq(filtered.n_rows(), 2)
+  assert_eq(filtered.get_row(0)[0], 3.0)
+  assert_eq(filtered.get_row(1)[0], 5.0)
+}
+
+///|
+test "DataFrame - sort" {
+  let columns = ["A", "B"]
+  let data = [[1.0, 3.0], [2.0, 1.0], [3.0, 2.0]]
+  let df = DataFrame::new(columns, data)
+  let sorted = df.sort("B", ascending=true)
+  assert_eq(sorted.get_row(0)[1], 1.0)
+  assert_eq(sorted.get_row(2)[1], 3.0)
+}
+
+///|
+test "DataFrame - drop and rename" {
+  let columns = ["A", "B", "C"]
+  let data = [[1.0, 2.0, 3.0]]
+  let df = DataFrame::new(columns, data)
+  let dropped = df.drop(["B"])
+  assert_eq(dropped.n_cols(), 2)
+  assert_eq(dropped.get_columns()[0], "A")
+  assert_eq(dropped.get_columns()[1], "C")
+  let renamed = dropped.rename(["A"], ["X"])
+  assert_eq(renamed.get_columns()[0], "X")
+}
+
+///|
+test "DataFrame - fillna" {
+  let columns = ["A", "B"]
+  let nan = @double.not_a_number
+  let data = [[1.0, nan], [nan, 4.0]]
+  let df = DataFrame::new(columns, data)
+  let filled = df.fillna(0.0)
+  assert_eq(filled.get_row(0)[1], 0.0)
+  assert_eq(filled.get_row(1)[0], 0.0)
+}
+
+///|
+test "DataFrame - describe" {
+  let columns = ["A", "B"]
+  let data = [[1.0, 2.0], [3.0, 4.0]]
+  let df = DataFrame::new(columns, data)
+  let stats = df.describe()
+  assert_eq(stats.n_rows, 2)
+  assert_eq(stats.n_cols, 2)
+  assert_eq(stats.columns[0], "A")
+  assert_eq(stats.stats[0].count, 2)
+  assert_true((stats.stats[0].mean - 2.0).abs() < 1.0e-9)
+  assert_eq(stats.stats[0].min, 1.0)
+  assert_eq(stats.stats[0].max, 3.0)
+}
