@@ -27,15 +27,23 @@ fn clip_grad_value(Array[OptimParam], Double) -> Unit
 
 fn cosine_decay(Double, Double, Int, Int) -> Double
 
+fn cosine_lr(Double, Int, min_lr? : Double) -> LRScheduler
+
 fn cross_entropy(Array[Int], @math.Matrix) -> Double
 
 fn early_stopping_max(Int, min_delta? : Double) -> EarlyStopping
 
 fn early_stopping_min(Int, min_delta? : Double) -> EarlyStopping
 
+fn eval_epoch(Sequential, @data.DataLoader, metrics_fn? : (@math.Tensor, Array[Int]) -> Map[String, Double]) -> TrainMetrics
+
 fn eval_step(Sequential, AutoTensor, Array[Int]) -> Double
 
 fn eval_step_batch(Sequential, @data.Batch) -> Double
+
+fn eval_step_batch_with_metrics(Sequential, @data.Batch, metrics_fn? : (@math.Tensor, Array[Int]) -> Map[String, Double]) -> (Double, Map[String, Double])
+
+fn eval_step_with_metrics(Sequential, AutoTensor, Array[Int], metrics_fn? : (@math.Tensor, Array[Int]) -> Map[String, Double]) -> (Double, Map[String, Double])
 
 fn focal_loss_binary(Array[Double], Array[Double], gamma? : Double, alpha? : Double, eps? : Double) -> Double
 
@@ -62,6 +70,8 @@ fn label_smoothing_cross_entropy(Array[Int], @math.Matrix, smoothing? : Double) 
 fn linear_rand_init(Int, Int, scale? : Double, seed? : Int) -> Linear
 
 fn linear_warmup(Double, Int, Int) -> Double
+
+fn lr_scheduler_step(LRScheduler, OptimizerParams) -> (LRScheduler, OptimizerParams)
 
 fn mae_loss(Array[Double], Array[Double]) -> Double
 
@@ -171,11 +181,21 @@ fn softmax_cross_entropy_with_probs(Array[Int], @math.Matrix) -> (Double, @math.
 
 fn step_decay(Double, Double, Int, Int) -> Double
 
+fn step_lr(Double, Int, Double) -> LRScheduler
+
+fn train_epoch(Sequential, @data.DataLoader, OptimizerParams, epoch? : Int, scheduler? : LRScheduler, callbacks? : TrainCallbacks, metrics_fn? : (@math.Tensor, Array[Int]) -> Map[String, Double]) -> (TrainMetrics, OptimizerParams, LRScheduler)
+
 fn train_step(Sequential, AutoTensor, Array[Int], OptimizerParams) -> (Double, OptimizerParams)
 
 fn train_step_batch(Sequential, @data.Batch, OptimizerParams) -> (Double, OptimizerParams)
 
+fn train_step_batch_with_metrics(Sequential, @data.Batch, OptimizerParams, metrics_fn? : (@math.Tensor, Array[Int]) -> Map[String, Double]) -> (Double, OptimizerParams, Map[String, Double])
+
+fn train_step_with_metrics(Sequential, AutoTensor, Array[Int], OptimizerParams, metrics_fn? : (@math.Tensor, Array[Int]) -> Map[String, Double]) -> (Double, OptimizerParams, Map[String, Double])
+
 fn warmup_cosine(Double, Double, Int, Int, Int) -> Double
+
+fn warmup_cosine_lr(Double, Int, Int, min_lr? : Double) -> LRScheduler
 
 // Errors
 
@@ -444,6 +464,13 @@ fn Conv2dModule::parameters(Self) -> Array[Parameter]
 fn Conv2dModule::set_params(Self, @math.Tensor, @math.Tensor) -> Unit
 fn Conv2dModule::sync_grads(Self, Conv2dContext) -> Unit
 
+pub struct CosineLRScheduler {
+  base_lr : Double
+  min_lr : Double
+  total_steps : Int
+  mut step : Int
+}
+
 pub struct Dropout {
   rate : Double
   mut seed : Int
@@ -509,6 +536,13 @@ fn Flatten2dModule::new() -> Self
 
 pub struct InferenceModeGuard {
   prev : Bool
+}
+
+pub enum LRScheduler {
+  None
+  StepLR(StepLRScheduler)
+  CosineLR(CosineLRScheduler)
+  WarmupCosineLR(WarmupCosineLRScheduler)
 }
 
 pub struct LayerNorm {
@@ -777,6 +811,43 @@ fn Sequential::parameters(Self) -> Array[Parameter]
 fn Sequential::state_dict(Self) -> Map[String, @math.Tensor]
 fn Sequential::sync_grads(Self, Array[ModuleContext]) -> Unit
 fn Sequential::train(Self) -> Unit
+
+pub struct StepLRScheduler {
+  base_lr : Double
+  step_size : Int
+  gamma : Double
+  mut step : Int
+}
+
+pub struct TrainCallbacks {
+  on_batch_end : (Int, Int, Double, TrainMetrics, OptimizerParams) -> Unit
+  on_epoch_end : (Int, TrainMetrics, OptimizerParams) -> Unit
+}
+fn TrainCallbacks::none() -> Self
+
+pub struct TrainMetrics {
+  mut loss_sum : Double
+  mut loss_count : Int
+  mut last_loss : Double
+  mut sums : Map[String, Double]
+  mut counts : Map[String, Int]
+}
+fn TrainMetrics::add_metric_avg(Self, String, Double, count? : Int) -> Unit
+fn TrainMetrics::add_metrics_avg(Self, Map[String, Double], Int) -> Unit
+fn TrainMetrics::last(Self) -> Double
+fn TrainMetrics::loss_avg(Self) -> Double
+fn TrainMetrics::metric_avg(Self, String) -> Double
+fn TrainMetrics::new() -> Self
+fn TrainMetrics::reset(Self) -> Unit
+fn TrainMetrics::update_loss(Self, Double, Int) -> Unit
+
+pub struct WarmupCosineLRScheduler {
+  base_lr : Double
+  min_lr : Double
+  total_steps : Int
+  warmup_steps : Int
+  mut step : Int
+}
 
 // Type aliases
 
