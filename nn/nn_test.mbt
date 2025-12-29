@@ -206,6 +206,16 @@ test "optimizer wrapper and schedules" {
 }
 
 ///|
+test "optimizer params step" {
+  let p = Parameter::new(@math.Tensor::new([1.0], [1]))
+  p.set_grad(@math.Tensor::new([0.1], [1]))
+  let opt = SGDParams::new(0.1, [p])
+  opt.step([p])
+  let v = p.get_data().get([0])
+  assert_true((v - 0.99).abs() < 1.0e-9)
+}
+
+///|
 test "mlp forward logits" {
   let mlp = MLP::new(2, [3], 2, output_activation=act_softmax(), seed=1)
   let x = @math.Matrix::new([[0.0, 0.0], [1.0, 1.0]])
