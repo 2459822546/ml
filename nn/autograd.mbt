@@ -279,6 +279,7 @@ pub enum Op {
   Dropout
   BatchNorm1d
   LayerNorm
+  Embedding
 }
 
 ///|
