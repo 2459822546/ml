@@ -1588,6 +1588,66 @@ fn module_named_parameters_add(
 }
 
 ///|
+fn module_named_parameters_list_into(
+  mod : Module,
+  prefix : String,
+  items : Array[(String, Parameter)],
+) -> Unit {
+  match mod {
+    Linear(m) => {
+      items.push((module_state_dict_key(prefix, "weight"), m.weight))
+      items.push((module_state_dict_key(prefix, "bias"), m.bias))
+    }
+    BatchNorm1d(m) => {
+      items.push((module_state_dict_key(prefix, "gamma"), m.gamma))
+      items.push((module_state_dict_key(prefix, "beta"), m.beta))
+    }
+    BatchNorm2d(m) => {
+      items.push((module_state_dict_key(prefix, "gamma"), m.gamma))
+      items.push((module_state_dict_key(prefix, "beta"), m.beta))
+    }
+    LayerNorm(m) => {
+      items.push((module_state_dict_key(prefix, "gamma"), m.gamma))
+      items.push((module_state_dict_key(prefix, "beta"), m.beta))
+    }
+    Embedding(m) =>
+      items.push((module_state_dict_key(prefix, "weight"), m.weight))
+    Conv2d(m) => {
+      items.push((module_state_dict_key(prefix, "weight"), m.weight))
+      items.push((module_state_dict_key(prefix, "bias"), m.bias))
+    }
+    Sequential(s) =>
+      for i = 0; i < s.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_parameters_list_into(s.modules[i], sub_prefix, items)
+      }
+    ModuleList(m) =>
+      for i = 0; i < m.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_parameters_list_into(m.modules[i], sub_prefix, items)
+      }
+    _ => ()
+  }
+}
+
+///|
+pub fn module_named_parameters_list(
+  mod : Module,
+  prefix? : String = "",
+) -> Array[(String, Parameter)] {
+  let items = []
+  module_named_parameters_list_into(mod, prefix, items)
+  let out = Array::make(
+    items.length(),
+    ("", Parameter::new(@math.Tensor::zeros([1]))),
+  )
+  for i = 0; i < items.length(); i = i + 1 {
+    out[i] = items[i]
+  }
+  out
+}
+
+///|
 fn module_named_parameters_into(
   mod : Module,
   prefix : String,
@@ -1682,6 +1742,69 @@ pub fn module_named_parameters(
   let dict = Map::new()
   module_named_parameters_into(mod, prefix, dict)
   dict
+}
+
+///|
+fn module_named_buffers_list_into(
+  mod : Module,
+  prefix : String,
+  items : Array[(String, @math.Tensor)],
+) -> Unit {
+  match mod {
+    BatchNorm1d(m) => {
+      items.push(
+        (
+          module_state_dict_key(prefix, "running_mean"),
+          module_array_to_tensor(m.running_mean),
+        ),
+      )
+      items.push(
+        (
+          module_state_dict_key(prefix, "running_var"),
+          module_array_to_tensor(m.running_var),
+        ),
+      )
+    }
+    BatchNorm2d(m) => {
+      items.push(
+        (
+          module_state_dict_key(prefix, "running_mean"),
+          module_array_to_tensor(m.running_mean),
+        ),
+      )
+      items.push(
+        (
+          module_state_dict_key(prefix, "running_var"),
+          module_array_to_tensor(m.running_var),
+        ),
+      )
+    }
+    Sequential(s) =>
+      for i = 0; i < s.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_buffers_list_into(s.modules[i], sub_prefix, items)
+      }
+    ModuleList(m) =>
+      for i = 0; i < m.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_buffers_list_into(m.modules[i], sub_prefix, items)
+      }
+    _ => ()
+  }
+}
+
+///|
+pub fn module_named_buffers_list(
+  mod : Module,
+  prefix? : String = "",
+) -> Array[(String, @math.Tensor)] {
+  let items = []
+  module_named_buffers_list_into(mod, prefix, items)
+  let out = Array::make(items.length(), ("", @math.Tensor::zeros([1])))
+  for i = 0; i < items.length(); i = i + 1 {
+    out[i] = items[i]
+  }
+  out
 }
 
 ///|
