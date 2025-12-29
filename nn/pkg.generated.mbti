@@ -237,10 +237,11 @@ fn ComputationGraph::add_bias(Self, Int, Int) -> Int
 fn ComputationGraph::add_input(Self, @math.Tensor, requires_grad? : Bool) -> Int
 fn ComputationGraph::backward(Self, Int) -> Unit
 fn ComputationGraph::backward_with_grad(Self, Int, @math.Tensor) -> Unit
-fn ComputationGraph::batchnorm1d_cached(Self, Int, @math.Tensor, @math.Tensor, @math.Tensor, @math.Tensor, @math.Tensor, Double, train? : Bool) -> Int
+fn ComputationGraph::batchnorm1d_cached(Self, Int, Int, Int, @math.Tensor, @math.Tensor, @math.Tensor, Double, train? : Bool) -> Int
 fn ComputationGraph::dropout(Self, Int, Double, Int) -> (Int, Int)
+fn ComputationGraph::embedding(Self, Int, @math.Tensor) -> Int
 fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
-fn ComputationGraph::layernorm(Self, Int, @math.Tensor, @math.Tensor, Double) -> Int
+fn ComputationGraph::layernorm(Self, Int, Int, Int, Double) -> Int
 fn ComputationGraph::matmul(Self, Int, Int) -> Int
 fn ComputationGraph::mul(Self, Int, Int) -> Int
 fn ComputationGraph::new() -> Self

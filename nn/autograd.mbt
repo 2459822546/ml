@@ -678,23 +678,22 @@ pub fn ComputationGraph::dropout(
 pub fn ComputationGraph::batchnorm1d_cached(
   self : ComputationGraph,
   x : Int,
+  gamma : Int,
+  beta : Int,
   out : @math.Tensor,
   mean : @math.Tensor,
   variance : @math.Tensor,
-  gamma : @math.Tensor,
-  beta : @math.Tensor,
   eps : Double,
   train? : Bool = true,
 ) -> Int {
-  let _ = beta
   let grad = tensor_zeros_like(out)
   self.nodes.push({
     value: out,
     grad,
     op: BatchNorm1d,
-    parents: [x],
+    parents: [x, gamma, beta],
     requires_grad: true,
-    aux_tensors: [mean, variance, gamma],
+    aux_tensors: [mean, variance],
     aux_scalars: [eps],
     aux_bool: train,
   })
@@ -705,21 +704,63 @@ pub fn ComputationGraph::batchnorm1d_cached(
 pub fn ComputationGraph::layernorm(
   self : ComputationGraph,
   x : Int,
-  gamma : @math.Tensor,
-  beta : @math.Tensor,
+  gamma : Int,
+  beta : Int,
   eps : Double,
 ) -> Int {
   let vx = self.nodes[x].value
-  let (out, mean, variance) = tensor_layernorm_forward(vx, gamma, beta, eps)
+  let g = self.nodes[gamma].value
+  let b = self.nodes[beta].value
+  let (out, mean, variance) = tensor_layernorm_forward(vx, g, b, eps)
   let grad = tensor_zeros_like(out)
   self.nodes.push({
     value: out,
     grad,
     op: LayerNorm,
-    parents: [x],
+    parents: [x, gamma, beta],
     requires_grad: true,
-    aux_tensors: [mean, variance, gamma],
+    aux_tensors: [mean, variance],
     aux_scalars: [eps],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::embedding(
+  self : ComputationGraph,
+  weight : Int,
+  indices : @math.Tensor,
+) -> Int {
+  let w = self.nodes[weight].value
+  let shape_w = w.get_shape()
+  if shape_w.length() != 2 {
+    abort("embedding 权重需要 2D 张量")
+  }
+  let n = indices.total_size()
+  let dim = shape_w[1]
+  let data = Array::make(n * dim, 0.0)
+  let mut idx = 0
+  for i = 0; i < n; i = i + 1 {
+    let row = indices.get([i]).to_int()
+    if row < 0 || row >= shape_w[0] {
+      abort("embedding 索引越界")
+    }
+    for j = 0; j < dim; j = j + 1 {
+      data[idx] = w.get([row, j])
+      idx = idx + 1
+    }
+  }
+  let out = @math.Tensor::new(data, [n, dim])
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Embedding,
+    parents: [weight],
+    requires_grad: true,
+    aux_tensors: [indices],
+    aux_scalars: [],
     aux_bool: false,
   })
   self.nodes.length() - 1
