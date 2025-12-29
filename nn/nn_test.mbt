@@ -464,6 +464,36 @@ test "train step batch from dataloader" {
 }
 
 ///|
+test "train epoch metrics and lr scheduler" {
+  fn dummy_metrics(
+    _logits : @math.Tensor,
+    _labels : Array[Int],
+  ) -> Map[String, Double] {
+    let out = Map::new()
+    out.set("dummy", 1.0)
+    out
+  }
+
+  let linear = LinearModule::new(2, 2, seed=4)
+  let seq = Sequential::new([module_linear(linear)])
+  let features = [[1.0, 0.0], [0.0, 1.0]]
+  let labels = [0.0, 1.0]
+  let ds = @data.Dataset::new(features, labels)
+  let loader = @data.DataLoader::new(ds, batch_size=1, shuffle=false)
+  let opt = optimizer_params_sgd(seq.parameters(), 0.2)
+  let sched = step_lr(0.2, 1, 0.5)
+  let (metrics, opt2, _sched2) = train_epoch(
+    seq,
+    loader,
+    opt,
+    scheduler=sched,
+    metrics_fn=dummy_metrics,
+  )
+  assert_true((metrics.metric_avg("dummy") - 1.0).abs() < 1.0e-9)
+  assert_true((opt2.get_lr() - 0.1).abs() < 1.0e-9)
+}
+
+///|
 test "mlp forward logits" {
   let mlp = MLP::new(2, [3], 2, output_activation=act_softmax(), seed=1)
   let x = @math.Matrix::new([[0.0, 0.0], [1.0, 1.0]])
