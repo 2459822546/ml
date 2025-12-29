@@ -1428,22 +1428,38 @@ pub fn ComputationGraph::add_input(
 }
 
 ///|
+fn ComputationGraph::record_op(
+  self : ComputationGraph,
+  value : @math.Tensor,
+  op : Op,
+  parents : Array[Int],
+  aux_tensors : Array[@math.Tensor],
+  aux_scalars : Array[Double],
+  aux_bool : Bool,
+) -> Int {
+  if not(grad_enabled()) {
+    return self.add_input(value, requires_grad=false)
+  }
+  let grad = tensor_zeros_like(value)
+  self.nodes.push({
+    value,
+    grad,
+    op,
+    parents,
+    requires_grad: true,
+    aux_tensors,
+    aux_scalars,
+    aux_bool,
+  })
+  self.nodes.length() - 1
+}
+
+///|
 pub fn ComputationGraph::add(self : ComputationGraph, a : Int, b : Int) -> Int {
   let va = self.nodes[a].value
   let vb = self.nodes[b].value
   let out = tensor_add(va, vb)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Add,
-    parents: [a, b],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, Add, [a, b], [], [], false)
 }
 
 ///|
@@ -1451,18 +1467,7 @@ pub fn ComputationGraph::sub(self : ComputationGraph, a : Int, b : Int) -> Int {
   let va = self.nodes[a].value
   let vb = self.nodes[b].value
   let out = tensor_sub(va, vb)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Sub,
-    parents: [a, b],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, Sub, [a, b], [], [], false)
 }
 
 ///|
@@ -1470,18 +1475,7 @@ pub fn ComputationGraph::mul(self : ComputationGraph, a : Int, b : Int) -> Int {
   let va = self.nodes[a].value
   let vb = self.nodes[b].value
   let out = tensor_mul(va, vb)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Mul,
-    parents: [a, b],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, Mul, [a, b], [], [], false)
 }
 
 ///|
@@ -1497,18 +1491,7 @@ pub fn ComputationGraph::relu(self : ComputationGraph, a : Int) -> Int {
     data[i] = if v > 0.0 { v } else { 0.0 }
   }
   let out = @math.Tensor::new(data, shape)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Relu,
-    parents: [a],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, Relu, [a], [], [], false)
 }
 
 ///|
@@ -1520,18 +1503,7 @@ pub fn ComputationGraph::matmul(
   let va = self.nodes[a].value
   let vb = self.nodes[b].value
   let out = tensor_matmul(va, vb)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: MatMul,
-    parents: [a, b],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, MatMul, [a, b], [], [], false)
 }
 
 ///|
@@ -1543,36 +1515,14 @@ pub fn ComputationGraph::add_bias(
   let vx = self.nodes[x].value
   let vb = self.nodes[bias].value
   let out = tensor_add_bias(vx, vb)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: AddBias,
-    parents: [x, bias],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, AddBias, [x, bias], [], [], false)
 }
 
 ///|
 pub fn ComputationGraph::sum(self : ComputationGraph, x : Int) -> Int {
   let vx = self.nodes[x].value
   let out = tensor_sum_all(vx)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Sum,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, Sum, [x], [], [], false)
 }
 
 ///|
@@ -1584,18 +1534,14 @@ pub fn ComputationGraph::sum_axis(
 ) -> Int {
   let vx = self.nodes[x].value
   let out = tensor_sum_axes(vx, [axis], keepdim~)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: SumAxis,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [tensor_shape_to_tensor(vx.get_shape())],
-    aux_scalars: [axis.to_double()],
-    aux_bool: keepdim,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    SumAxis,
+    [x],
+    [tensor_shape_to_tensor(vx.get_shape())],
+    [axis.to_double()],
+    keepdim,
+  )
 }
 
 ///|
@@ -1607,18 +1553,14 @@ pub fn ComputationGraph::mean_axis(
 ) -> Int {
   let vx = self.nodes[x].value
   let out = tensor_mean_axes(vx, [axis], keepdim~)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: MeanAxis,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [tensor_shape_to_tensor(vx.get_shape())],
-    aux_scalars: [axis.to_double()],
-    aux_bool: keepdim,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    MeanAxis,
+    [x],
+    [tensor_shape_to_tensor(vx.get_shape())],
+    [axis.to_double()],
+    keepdim,
+  )
 }
 
 ///|
@@ -1630,18 +1572,8 @@ pub fn ComputationGraph::dropout(
 ) -> (Int, Int) {
   let vx = self.nodes[x].value
   let (out, mask, new_seed) = tensor_dropout(vx, rate, seed)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Dropout,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [mask],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  (self.nodes.length() - 1, new_seed)
+  let id = self.record_op(out, Dropout, [x], [mask], [], false)
+  (id, new_seed)
 }
 
 ///|
@@ -1653,18 +1585,8 @@ pub fn ComputationGraph::dropout2d(
 ) -> (Int, Int) {
   let vx = self.nodes[x].value
   let (out, mask, new_seed) = tensor_dropout2d(vx, rate, seed)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Dropout2d,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [mask],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  (self.nodes.length() - 1, new_seed)
+  let id = self.record_op(out, Dropout2d, [x], [mask], [], false)
+  (id, new_seed)
 }
 
 ///|
@@ -1679,18 +1601,14 @@ pub fn ComputationGraph::batchnorm1d_cached(
   eps : Double,
   train? : Bool = true,
 ) -> Int {
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: BatchNorm1d,
-    parents: [x, gamma, beta],
-    requires_grad: true,
-    aux_tensors: [mean, variance],
-    aux_scalars: [eps],
-    aux_bool: train,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    BatchNorm1d,
+    [x, gamma, beta],
+    [mean, variance],
+    [eps],
+    train,
+  )
 }
 
 ///|
@@ -1705,18 +1623,14 @@ pub fn ComputationGraph::batchnorm2d_cached(
   eps : Double,
   train? : Bool = true,
 ) -> Int {
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: BatchNorm2d,
-    parents: [x, gamma, beta],
-    requires_grad: true,
-    aux_tensors: [mean, variance],
-    aux_scalars: [eps],
-    aux_bool: train,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    BatchNorm2d,
+    [x, gamma, beta],
+    [mean, variance],
+    [eps],
+    train,
+  )
 }
 
 ///|
@@ -1731,18 +1645,14 @@ pub fn ComputationGraph::layernorm(
   let g = self.nodes[gamma].value
   let b = self.nodes[beta].value
   let (out, mean, variance) = tensor_layernorm_forward(vx, g, b, eps)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: LayerNorm,
-    parents: [x, gamma, beta],
-    requires_grad: true,
-    aux_tensors: [mean, variance],
-    aux_scalars: [eps],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    LayerNorm,
+    [x, gamma, beta],
+    [mean, variance],
+    [eps],
+    false,
+  )
 }
 
 ///|
@@ -1771,18 +1681,7 @@ pub fn ComputationGraph::embedding(
     }
   }
   let out = @math.Tensor::new(data, [n, dim])
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Embedding,
-    parents: [weight],
-    requires_grad: true,
-    aux_tensors: [indices],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, Embedding, [weight], [indices], [], false)
 }
 
 ///|
@@ -1798,18 +1697,14 @@ pub fn ComputationGraph::conv2d(
   let vw = self.nodes[weight].value
   let vb = self.nodes[bias].value
   let out = tensor_conv2d(vx, vw, vb, stride, padding)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Conv2d,
-    parents: [x, weight, bias],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [stride.to_double(), padding.to_double()],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    Conv2d,
+    [x, weight, bias],
+    [],
+    [stride.to_double(), padding.to_double()],
+    false,
+  )
 }
 
 ///|
@@ -1821,18 +1716,14 @@ pub fn ComputationGraph::maxpool2d(
 ) -> Int {
   let vx = self.nodes[x].value
   let (out, idx_h, idx_w) = tensor_maxpool2d(vx, kernel, stride)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: MaxPool2d,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [idx_h, idx_w],
-    aux_scalars: [kernel.to_double(), stride.to_double()],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    MaxPool2d,
+    [x],
+    [idx_h, idx_w],
+    [kernel.to_double(), stride.to_double()],
+    false,
+  )
 }
 
 ///|
@@ -1844,18 +1735,14 @@ pub fn ComputationGraph::avgpool2d(
 ) -> Int {
   let vx = self.nodes[x].value
   let out = tensor_avgpool2d(vx, kernel, stride)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: AvgPool2d,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [kernel.to_double(), stride.to_double()],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    AvgPool2d,
+    [x],
+    [],
+    [kernel.to_double(), stride.to_double()],
+    false,
+  )
 }
 
 ///|
@@ -1870,18 +1757,14 @@ pub fn ComputationGraph::flatten2d(self : ComputationGraph, x : Int) -> Int {
   let h = shape[2]
   let w = shape[3]
   let out = tensor_reshape(vx, [n, c * h * w])
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Flatten2d,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [tensor_shape_to_tensor(shape)],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    Flatten2d,
+    [x],
+    [tensor_shape_to_tensor(shape)],
+    [],
+    false,
+  )
 }
 
 ///|
@@ -1892,18 +1775,14 @@ pub fn ComputationGraph::reshape(
 ) -> Int {
   let vx = self.nodes[x].value
   let out = tensor_reshape(vx, shape)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Reshape,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [tensor_shape_to_tensor(vx.get_shape())],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    Reshape,
+    [x],
+    [tensor_shape_to_tensor(vx.get_shape())],
+    [],
+    false,
+  )
 }
 
 ///|
@@ -1914,18 +1793,7 @@ pub fn ComputationGraph::transpose(
 ) -> Int {
   let vx = self.nodes[x].value
   let out = tensor_transpose(vx, axes)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: Transpose,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [tensor_shape_to_tensor(axes)],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, Transpose, [x], [tensor_shape_to_tensor(axes)], [], false)
 }
 
 ///|
@@ -1938,18 +1806,7 @@ pub fn ComputationGraph::log_softmax(
   let lse = tensor_logsumexp_axis(vx, axis, keepdim=true)
   let out = tensor_sub(vx, lse)
   let probs = tensor_exp(out)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: LogSoftmax,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [probs],
-    aux_scalars: [axis.to_double()],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, LogSoftmax, [x], [probs], [axis.to_double()], false)
 }
 
 ///|
@@ -1961,18 +1818,7 @@ pub fn ComputationGraph::logsumexp(
 ) -> Int {
   let vx = self.nodes[x].value
   let out = tensor_logsumexp_axis(vx, axis, keepdim~)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: LogSumExp,
-    parents: [x],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [axis.to_double()],
-    aux_bool: keepdim,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, LogSumExp, [x], [], [axis.to_double()], keepdim)
 }
 
 ///|
@@ -1983,18 +1829,14 @@ pub fn ComputationGraph::softmax_cross_entropy(
 ) -> Int {
   let v = self.nodes[logits].value
   let (out, probs) = tensor_softmax_cross_entropy(v, labels)
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: SoftmaxCrossEntropy,
-    parents: [logits],
-    requires_grad: true,
-    aux_tensors: [probs, labels_to_tensor(labels)],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    SoftmaxCrossEntropy,
+    [logits],
+    [probs, labels_to_tensor(labels)],
+    [],
+    false,
+  )
 }
 
 ///|
@@ -2023,18 +1865,14 @@ pub fn ComputationGraph::nll_loss(
   }
   let loss_val = loss / n.to_double()
   let out = @math.Tensor::new([loss_val], [1])
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: NLLLoss,
-    parents: [log_probs],
-    requires_grad: true,
-    aux_tensors: [labels_to_tensor(labels)],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(
+    out,
+    NLLLoss,
+    [log_probs],
+    [labels_to_tensor(labels)],
+    [],
+    false,
+  )
 }
 
 ///|
@@ -2057,18 +1895,7 @@ pub fn ComputationGraph::mse_loss(
   }
   let loss_val = sum / total.to_double()
   let out = @math.Tensor::new([loss_val], [1])
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: MSELoss,
-    parents: [pred, target],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, MSELoss, [pred, target], [], [], false)
 }
 
 ///|
@@ -2090,18 +1917,7 @@ pub fn ComputationGraph::mae_loss(
   }
   let loss_val = sum / total.to_double()
   let out = @math.Tensor::new([loss_val], [1])
-  let grad = tensor_zeros_like(out)
-  self.nodes.push({
-    value: out,
-    grad,
-    op: MAELoss,
-    parents: [pred, target],
-    requires_grad: true,
-    aux_tensors: [],
-    aux_scalars: [],
-    aux_bool: false,
-  })
-  self.nodes.length() - 1
+  self.record_op(out, MAELoss, [pred, target], [], [], false)
 }
 
 ///|
