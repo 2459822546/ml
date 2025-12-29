@@ -59,18 +59,19 @@ fn tensor_hadamard(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
 
 ///|
 fn tensor_add(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
-  let shape = a.get_shape()
-  if shape != b.get_shape() {
-    abort("张量形状不一致")
-  }
-  let strides = compute_strides(shape)
-  let total = a.total_size()
+  let shape_a = a.get_shape()
+  let shape_b = b.get_shape()
+  let out_shape = broadcast_shape(shape_a, shape_b)
+  let out_strides = compute_strides(out_shape)
+  let total = tensor_total_size(out_shape)
   let data = Array::make(total, 0.0)
   for i = 0; i < total; i = i + 1 {
-    let idx = indices_from_flat(shape, strides, i)
-    data[i] = a.get(idx) + b.get(idx)
+    let out_idx = indices_from_flat(out_shape, out_strides, i)
+    let a_idx = broadcast_indices(out_idx, out_shape, shape_a)
+    let b_idx = broadcast_indices(out_idx, out_shape, shape_b)
+    data[i] = a.get(a_idx) + b.get(b_idx)
   }
-  @math.Tensor::new(data, shape)
+  @math.Tensor::new(data, out_shape)
 }
 
 ///|
@@ -172,6 +173,45 @@ fn tensor_scale(t : @math.Tensor, scalar : Double) -> @math.Tensor {
 }
 
 ///|
+fn tensor_sub(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  let shape_a = a.get_shape()
+  let shape_b = b.get_shape()
+  let out_shape = broadcast_shape(shape_a, shape_b)
+  let out_strides = compute_strides(out_shape)
+  let total = tensor_total_size(out_shape)
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    let out_idx = indices_from_flat(out_shape, out_strides, i)
+    let a_idx = broadcast_indices(out_idx, out_shape, shape_a)
+    let b_idx = broadcast_indices(out_idx, out_shape, shape_b)
+    data[i] = a.get(a_idx) - b.get(b_idx)
+  }
+  @math.Tensor::new(data, out_shape)
+}
+
+///|
+fn tensor_mul(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  let shape_a = a.get_shape()
+  let shape_b = b.get_shape()
+  let out_shape = broadcast_shape(shape_a, shape_b)
+  let out_strides = compute_strides(out_shape)
+  let total = tensor_total_size(out_shape)
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    let out_idx = indices_from_flat(out_shape, out_strides, i)
+    let a_idx = broadcast_indices(out_idx, out_shape, shape_a)
+    let b_idx = broadcast_indices(out_idx, out_shape, shape_b)
+    data[i] = a.get(a_idx) * b.get(b_idx)
+  }
+  @math.Tensor::new(data, out_shape)
+}
+
+///|
+fn tensor_transpose(t : @math.Tensor, axes : Array[Int]) -> @math.Tensor {
+  t.transpose(axes~)
+}
+
+///|
 fn tensor_matmul(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
   let shape_a = a.get_shape()
   let shape_b = b.get_shape()
@@ -234,6 +274,322 @@ fn tensor_sum_all(x : @math.Tensor) -> @math.Tensor {
     sum = sum + x.get(idx)
   }
   @math.Tensor::new([sum], [1])
+}
+
+///|
+fn tensor_total_size(shape : Array[Int]) -> Int {
+  let mut total = 1
+  for i = 0; i < shape.length(); i = i + 1 {
+    total = total * shape[i]
+  }
+  total
+}
+
+///|
+fn broadcast_shape(a_shape : Array[Int], b_shape : Array[Int]) -> Array[Int] {
+  let a_len = a_shape.length()
+  let b_len = b_shape.length()
+  let out_len = if a_len > b_len { a_len } else { b_len }
+  let out_shape = Array::make(out_len, 0)
+  for i = 0; i < out_len; i = i + 1 {
+    let a_i = i + a_len - out_len
+    let b_i = i + b_len - out_len
+    let a_dim = if a_i >= 0 { a_shape[a_i] } else { 1 }
+    let b_dim = if b_i >= 0 { b_shape[b_i] } else { 1 }
+    if a_dim == b_dim || a_dim == 1 || b_dim == 1 {
+      out_shape[i] = if a_dim > b_dim { a_dim } else { b_dim }
+    } else {
+      abort("张量形状不一致")
+    }
+  }
+  out_shape
+}
+
+///|
+fn broadcast_indices(
+  out_indices : Array[Int],
+  out_shape : Array[Int],
+  in_shape : Array[Int],
+) -> Array[Int] {
+  let out_len = out_shape.length()
+  let in_len = in_shape.length()
+  let offset = out_len - in_len
+  let idx = Array::make(in_len, 0)
+  for i = 0; i < in_len; i = i + 1 {
+    let out_i = i + offset
+    idx[i] = if in_shape[i] == 1 { 0 } else { out_indices[out_i] }
+  }
+  idx
+}
+
+///|
+fn tensor_reduce_to_shape(
+  grad : @math.Tensor,
+  shape : Array[Int],
+) -> @math.Tensor {
+  let grad_shape = grad.get_shape()
+  if grad_shape == shape {
+    return @math.Tensor::new(tensor_flatten_data(grad), shape)
+  }
+  if grad_shape.length() < shape.length() {
+    abort("reduce 目标形状不合法")
+  }
+  let out = @math.Tensor::zeros(shape)
+  let grad_strides = compute_strides(grad_shape)
+  let total = grad.total_size()
+  let offset = grad_shape.length() - shape.length()
+  for i = 0; i < total; i = i + 1 {
+    let g_idx = indices_from_flat(grad_shape, grad_strides, i)
+    let out_idx = Array::make(shape.length(), 0)
+    for d = 0; d < shape.length(); d = d + 1 {
+      let g_pos = d + offset
+      let v = if shape[d] == 1 { 0 } else { g_idx[g_pos] }
+      out_idx[d] = v
+    }
+    out.set(out_idx, out.get(out_idx) + grad.get(g_idx))
+  }
+  out
+}
+
+///|
+fn tensor_broadcast_to(x : @math.Tensor, shape : Array[Int]) -> @math.Tensor {
+  let in_shape = x.get_shape()
+  let out_shape = broadcast_shape(in_shape, shape)
+  if out_shape != shape {
+    abort("广播目标形状不匹配")
+  }
+  let out_strides = compute_strides(out_shape)
+  let total = tensor_total_size(out_shape)
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    let out_idx = indices_from_flat(out_shape, out_strides, i)
+    let in_idx = broadcast_indices(out_idx, out_shape, in_shape)
+    data[i] = x.get(in_idx)
+  }
+  @math.Tensor::new(data, out_shape)
+}
+
+///|
+fn tensor_expand_for_axis(
+  t : @math.Tensor,
+  input_shape : Array[Int],
+  axis : Int,
+  keepdim : Bool,
+) -> @math.Tensor {
+  let shape = if keepdim {
+    t
+  } else {
+    let reshape_shape = Array::make(input_shape.length(), 0)
+    for i = 0; i < input_shape.length(); i = i + 1 {
+      reshape_shape[i] = if i == axis { 1 } else { input_shape[i] }
+    }
+    tensor_reshape(t, reshape_shape)
+  }
+  tensor_broadcast_to(shape, input_shape)
+}
+
+///|
+fn tensor_sum_axes(
+  x : @math.Tensor,
+  axes : Array[Int],
+  keepdim? : Bool = false,
+) -> @math.Tensor {
+  if axes.length() == 0 {
+    return @math.Tensor::new(tensor_flatten_data(x), x.get_shape())
+  }
+  let shape = x.get_shape()
+  let ndim = shape.length()
+  let reduce_mask = Array::make(ndim, false)
+  for i = 0; i < axes.length(); i = i + 1 {
+    let ax = axes[i]
+    if ax < 0 || ax >= ndim {
+      abort("轴索引越界")
+    }
+    if reduce_mask[ax] {
+      abort("轴重复")
+    }
+    reduce_mask[ax] = true
+  }
+  let out_shape = if keepdim {
+    let s = Array::make(ndim, 0)
+    for d = 0; d < ndim; d = d + 1 {
+      s[d] = if reduce_mask[d] { 1 } else { shape[d] }
+    }
+    s
+  } else {
+    let s = Array::make(ndim - axes.length(), 0)
+    let mut pos = 0
+    for d = 0; d < ndim; d = d + 1 {
+      if not(reduce_mask[d]) {
+        s[pos] = shape[d]
+        pos = pos + 1
+      }
+    }
+    s
+  }
+  let out_strides = compute_strides(out_shape)
+  let out_size = tensor_total_size(out_shape)
+  let data = Array::make(out_size, 0.0)
+  let strides = compute_strides(shape)
+  let total = x.total_size()
+  for i = 0; i < total; i = i + 1 {
+    let coords = indices_from_flat(shape, strides, i)
+    let out_indices = if keepdim {
+      let tmp = Array::make(ndim, 0)
+      for d = 0; d < ndim; d = d + 1 {
+        tmp[d] = if reduce_mask[d] { 0 } else { coords[d] }
+      }
+      tmp
+    } else {
+      let tmp = Array::make(out_shape.length(), 0)
+      let mut pos = 0
+      for d = 0; d < ndim; d = d + 1 {
+        if not(reduce_mask[d]) {
+          tmp[pos] = coords[d]
+          pos = pos + 1
+        }
+      }
+      tmp
+    }
+    let mut out_idx = 0
+    for d = 0; d < out_indices.length(); d = d + 1 {
+      out_idx = out_idx + out_indices[d] * out_strides[d]
+    }
+    data[out_idx] = data[out_idx] + x.get(coords)
+  }
+  @math.Tensor::new(data, out_shape)
+}
+
+///|
+fn tensor_mean_axes(
+  x : @math.Tensor,
+  axes : Array[Int],
+  keepdim? : Bool = false,
+) -> @math.Tensor {
+  if axes.length() == 0 {
+    return @math.Tensor::new(tensor_flatten_data(x), x.get_shape())
+  }
+  let mut denom = 1.0
+  let shape = x.get_shape()
+  for i = 0; i < axes.length(); i = i + 1 {
+    let ax = axes[i]
+    if ax < 0 || ax >= shape.length() {
+      abort("轴索引越界")
+    }
+    denom = denom * shape[ax].to_double()
+  }
+  let sum = tensor_sum_axes(x, axes, keepdim~)
+  tensor_scale(sum, 1.0 / denom)
+}
+
+///|
+fn tensor_logsumexp_axis(
+  x : @math.Tensor,
+  axis : Int,
+  keepdim? : Bool = false,
+) -> @math.Tensor {
+  let shape = x.get_shape()
+  let ndim = shape.length()
+  if axis < 0 || axis >= ndim {
+    abort("轴索引越界")
+  }
+  let reduce_mask = Array::make(ndim, false)
+  reduce_mask[axis] = true
+  let out_shape = if keepdim {
+    let s = Array::make(ndim, 0)
+    for d = 0; d < ndim; d = d + 1 {
+      s[d] = if reduce_mask[d] { 1 } else { shape[d] }
+    }
+    s
+  } else {
+    let s = Array::make(ndim - 1, 0)
+    let mut pos = 0
+    for d = 0; d < ndim; d = d + 1 {
+      if not(reduce_mask[d]) {
+        s[pos] = shape[d]
+        pos = pos + 1
+      }
+    }
+    s
+  }
+  let out_strides = compute_strides(out_shape)
+  let out_size = tensor_total_size(out_shape)
+  let max_data = Array::make(out_size, -@double.infinity)
+  let sum_data = Array::make(out_size, 0.0)
+  let strides = compute_strides(shape)
+  let total = x.total_size()
+  for i = 0; i < total; i = i + 1 {
+    let coords = indices_from_flat(shape, strides, i)
+    let out_indices = if keepdim {
+      let tmp = Array::make(ndim, 0)
+      for d = 0; d < ndim; d = d + 1 {
+        tmp[d] = if reduce_mask[d] { 0 } else { coords[d] }
+      }
+      tmp
+    } else {
+      let tmp = Array::make(out_shape.length(), 0)
+      let mut pos = 0
+      for d = 0; d < ndim; d = d + 1 {
+        if not(reduce_mask[d]) {
+          tmp[pos] = coords[d]
+          pos = pos + 1
+        }
+      }
+      tmp
+    }
+    let mut out_idx = 0
+    for d = 0; d < out_indices.length(); d = d + 1 {
+      out_idx = out_idx + out_indices[d] * out_strides[d]
+    }
+    let v = x.get(coords)
+    if v > max_data[out_idx] {
+      max_data[out_idx] = v
+    }
+  }
+  for i = 0; i < total; i = i + 1 {
+    let coords = indices_from_flat(shape, strides, i)
+    let out_indices = if keepdim {
+      let tmp = Array::make(ndim, 0)
+      for d = 0; d < ndim; d = d + 1 {
+        tmp[d] = if reduce_mask[d] { 0 } else { coords[d] }
+      }
+      tmp
+    } else {
+      let tmp = Array::make(out_shape.length(), 0)
+      let mut pos = 0
+      for d = 0; d < ndim; d = d + 1 {
+        if not(reduce_mask[d]) {
+          tmp[pos] = coords[d]
+          pos = pos + 1
+        }
+      }
+      tmp
+    }
+    let mut out_idx = 0
+    for d = 0; d < out_indices.length(); d = d + 1 {
+      out_idx = out_idx + out_indices[d] * out_strides[d]
+    }
+    sum_data[out_idx] = sum_data[out_idx] +
+      @moonbitlang/core/math.exp(x.get(coords) - max_data[out_idx])
+  }
+  let out_data = Array::make(out_size, 0.0)
+  for i = 0; i < out_size; i = i + 1 {
+    out_data[i] = @moonbitlang/core/math.ln(sum_data[i]) + max_data[i]
+  }
+  @math.Tensor::new(out_data, out_shape)
+}
+
+///|
+fn tensor_exp(x : @math.Tensor) -> @math.Tensor {
+  let shape = x.get_shape()
+  let strides = compute_strides(shape)
+  let total = x.total_size()
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    data[i] = @moonbitlang/core/math.exp(x.get(idx))
+  }
+  @math.Tensor::new(data, shape)
 }
 
 ///|
