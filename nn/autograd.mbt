@@ -111,12 +111,93 @@ fn tensor_zeros_like(t : @math.Tensor) -> @math.Tensor {
 }
 
 ///|
+fn tensor_scale(t : @math.Tensor, scalar : Double) -> @math.Tensor {
+  let shape = t.get_shape()
+  let strides = compute_strides(shape)
+  let total = t.total_size()
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    data[i] = t.get(idx) * scalar
+  }
+  @math.Tensor::new(data, shape)
+}
+
+///|
+fn tensor_matmul(a : @math.Tensor, b : @math.Tensor) -> @math.Tensor {
+  let shape_a = a.get_shape()
+  let shape_b = b.get_shape()
+  if shape_a.length() != 2 || shape_b.length() != 2 {
+    abort("matmul 仅支持 2D 张量")
+  }
+  let m = shape_a[0]
+  let k = shape_a[1]
+  let kb = shape_b[0]
+  let n = shape_b[1]
+  if k != kb {
+    abort("matmul 维度不匹配")
+  }
+  let data = Array::make(m * n, 0.0)
+  let mut idx = 0
+  for i = 0; i < m; i = i + 1 {
+    for j = 0; j < n; j = j + 1 {
+      let mut sum = 0.0
+      for p = 0; p < k; p = p + 1 {
+        sum = sum + a.get([i, p]) * b.get([p, j])
+      }
+      data[idx] = sum
+      idx = idx + 1
+    }
+  }
+  @math.Tensor::new(data, [m, n])
+}
+
+///|
+fn tensor_add_bias(x : @math.Tensor, bias : @math.Tensor) -> @math.Tensor {
+  let shape_x = x.get_shape()
+  let shape_b = bias.get_shape()
+  if shape_x.length() != 2 || shape_b.length() != 1 {
+    abort("add_bias 需要形状 [batch, features] + [features]")
+  }
+  let n = shape_x[0]
+  let m = shape_x[1]
+  if shape_b[0] != m {
+    abort("bias 维度不匹配")
+  }
+  let data = Array::make(n * m, 0.0)
+  let mut idx = 0
+  for i = 0; i < n; i = i + 1 {
+    for j = 0; j < m; j = j + 1 {
+      data[idx] = x.get([i, j]) + bias.get([j])
+      idx = idx + 1
+    }
+  }
+  @math.Tensor::new(data, [n, m])
+}
+
+///|
+fn tensor_sum_all(x : @math.Tensor) -> @math.Tensor {
+  let shape = x.get_shape()
+  let strides = compute_strides(shape)
+  let total = x.total_size()
+  let mut sum = 0.0
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    sum = sum + x.get(idx)
+  }
+  @math.Tensor::new([sum], [1])
+}
+
+///|
 pub enum Op {
   Input
   Add
   Sub
   Mul
   Relu
+  MatMul
+  AddBias
+  Sum
 }
 
 ///|
@@ -222,6 +303,61 @@ pub fn ComputationGraph::relu(self : ComputationGraph, a : Int) -> Int {
 }
 
 ///|
+pub fn ComputationGraph::matmul(
+  self : ComputationGraph,
+  a : Int,
+  b : Int,
+) -> Int {
+  let va = self.nodes[a].value
+  let vb = self.nodes[b].value
+  let out = tensor_matmul(va, vb)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: MatMul,
+    parents: [a, b],
+    requires_grad: true,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::add_bias(
+  self : ComputationGraph,
+  x : Int,
+  bias : Int,
+) -> Int {
+  let vx = self.nodes[x].value
+  let vb = self.nodes[bias].value
+  let out = tensor_add_bias(vx, vb)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: AddBias,
+    parents: [x, bias],
+    requires_grad: true,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::sum(self : ComputationGraph, x : Int) -> Int {
+  let vx = self.nodes[x].value
+  let out = tensor_sum_all(vx)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Sum,
+    parents: [x],
+    requires_grad: true,
+  })
+  self.nodes.length() - 1
+}
+
+///|
 fn topo_collect(
   g : ComputationGraph,
   root : Int,
@@ -300,6 +436,55 @@ pub fn ComputationGraph::backward_with_grad(
         let p = node.parents[0]
         let mask = tensor_mask_relu(self.nodes[p].value)
         let back = tensor_hadamard(g, mask)
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      MatMul => {
+        let g = node.grad
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        let a = self.nodes[p0].value
+        let b = self.nodes[p1].value
+        let shape_a = a.get_shape()
+        let shape_b = b.get_shape()
+        let m = shape_a[0]
+        let k = shape_a[1]
+        let n = shape_b[1]
+        let grad_a = @math.Tensor::zeros([m, k])
+        let grad_b = @math.Tensor::zeros([k, n])
+        for i = 0; i < m; i = i + 1 {
+          for j = 0; j < n; j = j + 1 {
+            let gij = g.get([i, j])
+            for p = 0; p < k; p = p + 1 {
+              grad_a.set([i, p], grad_a.get([i, p]) + gij * b.get([p, j]))
+              grad_b.set([p, j], grad_b.get([p, j]) + a.get([i, p]) * gij)
+            }
+          }
+        }
+        tensor_add_inplace(self.nodes[p0].grad, grad_a)
+        tensor_add_inplace(self.nodes[p1].grad, grad_b)
+      }
+      AddBias => {
+        let g = node.grad
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        tensor_add_inplace(self.nodes[p0].grad, g)
+        let shape_g = g.get_shape()
+        let n = shape_g[0]
+        let m = shape_g[1]
+        let grad_b = @math.Tensor::zeros([m])
+        for i = 0; i < n; i = i + 1 {
+          for j = 0; j < m; j = j + 1 {
+            grad_b.set([j], grad_b.get([j]) + g.get([i, j]))
+          }
+        }
+        tensor_add_inplace(self.nodes[p1].grad, grad_b)
+      }
+      Sum => {
+        let g = node.grad
+        let p = node.parents[0]
+        let scalar = g.get([0])
+        let base = tensor_ones_like(self.nodes[p].value)
+        let back = tensor_scale(base, scalar)
         tensor_add_inplace(self.nodes[p].grad, back)
       }
     }
