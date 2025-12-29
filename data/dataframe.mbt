@@ -8,6 +8,25 @@ pub struct DataFrame {
 }
 
 ///|
+/// 列统计结果
+pub struct ColumnStats {
+  count : Int
+  mean : Double
+  std : Double
+  min : Double
+  max : Double
+}
+
+///|
+/// DataFrame 统计结果
+pub struct DataFrameStats {
+  n_rows : Int
+  n_cols : Int
+  columns : Array[String]
+  stats : Array[ColumnStats]
+}
+
+///|
 /// 校验数据行的列数是否与列名一致
 fn validate_data_shape(
   columns : Array[String],
@@ -224,38 +243,239 @@ pub fn DataFrame::get_columns(self : DataFrame) -> Array[String] {
 }
 
 ///|
-/// 描述性统计
-pub fn DataFrame::describe(self : DataFrame) -> Unit {
-  println("DataFrame 统计信息:")
-  println("形状: (\{self.n_rows()}, \{self.n_cols()})")
-  println("列名: \{self.columns}")
-  if self.n_rows() == 0 {
-    println("数据为空，跳过列统计")
-    return
+/// 描述性统计（返回结果）
+pub fn DataFrame::describe(self : DataFrame) -> DataFrameStats {
+  let n_rows = self.n_rows()
+  let n_cols = self.n_cols()
+  let stats = Array::make(n_cols, {
+    count: 0,
+    mean: @double.not_a_number,
+    std: @double.not_a_number,
+    min: @double.not_a_number,
+    max: @double.not_a_number,
+  })
+  if n_rows == 0 || n_cols == 0 {
+    return { n_rows, n_cols, columns: self.columns, stats }
   }
-  for col_idx = 0; col_idx < self.n_cols(); col_idx = col_idx + 1 {
+  for col_idx = 0; col_idx < n_cols; col_idx = col_idx + 1 {
     let mut sum = 0.0
-    let mut min_val = self.data[0][col_idx]
-    let mut max_val = self.data[0][col_idx]
-    for row_idx = 0; row_idx < self.n_rows(); row_idx = row_idx + 1 {
+    let mut count = 0
+    let mut min_val = @double.not_a_number
+    let mut max_val = @double.not_a_number
+    for row_idx = 0; row_idx < n_rows; row_idx = row_idx + 1 {
       let value = self.data[row_idx][col_idx]
+      if is_nan(value) {
+        continue
+      }
       sum = sum + value
-      if value < min_val {
+      if count == 0 {
         min_val = value
-      }
-      if value > max_val {
         max_val = value
+      } else {
+        if value < min_val {
+          min_val = value
+        }
+        if value > max_val {
+          max_val = value
+        }
       }
+      count = count + 1
     }
-    let mean = sum / self.n_rows().to_double()
+    if count == 0 {
+      stats[col_idx] = {
+        count: 0,
+        mean: @double.not_a_number,
+        std: @double.not_a_number,
+        min: @double.not_a_number,
+        max: @double.not_a_number,
+      }
+      continue
+    }
+    let mean = sum / count.to_double()
     let mut var_sum = 0.0
-    for row_idx = 0; row_idx < self.n_rows(); row_idx = row_idx + 1 {
-      let diff = self.data[row_idx][col_idx] - mean
+    for row_idx = 0; row_idx < n_rows; row_idx = row_idx + 1 {
+      let value = self.data[row_idx][col_idx]
+      if is_nan(value) {
+        continue
+      }
+      let diff = value - mean
       var_sum = var_sum + diff * diff
     }
-    let std = (var_sum / self.n_rows().to_double()).sqrt()
-    println(
-      "- \{self.columns[col_idx]}: count=\{self.n_rows()}, mean=\{mean}, std=\{std}, min=\{min_val}, max=\{max_val}",
-    )
+    let std = (var_sum / count.to_double()).sqrt()
+    stats[col_idx] = { count, mean, std, min: min_val, max: max_val }
+  }
+  { n_rows, n_cols, columns: self.columns, stats }
+}
+
+///|
+/// 行过滤
+pub fn DataFrame::filter(
+  self : DataFrame,
+  predicate : (Array[Double]) -> Bool,
+) -> DataFrame {
+  let rows = []
+  for i = 0; i < self.n_rows(); i = i + 1 {
+    let row = self.data[i]
+    if predicate(row) {
+      rows.push(row)
+    }
+  }
+  let new_data = Array::make(rows.length(), [])
+  for i = 0; i < rows.length(); i = i + 1 {
+    new_data[i] = rows[i]
+  }
+  DataFrame::new(self.columns, new_data)
+}
+
+///|
+/// 按列排序
+pub fn DataFrame::sort(
+  self : DataFrame,
+  col_name : String,
+  ascending? : Bool = true,
+) -> DataFrame {
+  let col_index = self.find_column_index(col_name)
+  if col_index == -1 {
+    abort("列名不存在: " + col_name)
+  }
+  let n = self.n_rows()
+  let indices = Array::make(n, 0)
+  for i = 0; i < n; i = i + 1 {
+    indices[i] = i
+  }
+  for i = 1; i < n; i = i + 1 {
+    let key = indices[i]
+    let mut j = i - 1
+    while j >= 0 {
+      let a = self.data[indices[j]][col_index]
+      let b = self.data[key][col_index]
+      let cmp = compare_values(a, b, ascending)
+      if cmp <= 0 {
+        break
+      }
+      indices[j + 1] = indices[j]
+      j = j - 1
+    }
+    indices[j + 1] = key
+  }
+  let new_data = Array::make(n, [])
+  for i = 0; i < n; i = i + 1 {
+    new_data[i] = self.data[indices[i]]
+  }
+  DataFrame::new(self.columns, new_data)
+}
+
+///|
+/// 删除列
+pub fn DataFrame::drop(
+  self : DataFrame,
+  col_names : Array[String],
+) -> DataFrame {
+  if col_names.length() == 0 {
+    return DataFrame::new(self.columns, self.data)
+  }
+  let drop_mask = Array::make(self.n_cols(), false)
+  for i = 0; i < col_names.length(); i = i + 1 {
+    let idx = self.find_column_index(col_names[i])
+    if idx == -1 {
+      abort("列名不存在: " + col_names[i])
+    }
+    drop_mask[idx] = true
+  }
+  let keep_cols = []
+  let keep_indices = []
+  for i = 0; i < self.n_cols(); i = i + 1 {
+    if not(drop_mask[i]) {
+      keep_cols.push(self.columns[i])
+      keep_indices.push(i)
+    }
+  }
+  let new_columns = Array::make(keep_cols.length(), "")
+  for i = 0; i < keep_cols.length(); i = i + 1 {
+    new_columns[i] = keep_cols[i]
+  }
+  let new_data = Array::make(self.n_rows(), [])
+  for i = 0; i < self.n_rows(); i = i + 1 {
+    let row = Array::make(keep_indices.length(), 0.0)
+    for j = 0; j < keep_indices.length(); j = j + 1 {
+      row[j] = self.data[i][keep_indices[j]]
+    }
+    new_data[i] = row
+  }
+  DataFrame::new(new_columns, new_data)
+}
+
+///|
+/// 重命名列
+pub fn DataFrame::rename(
+  self : DataFrame,
+  old_names : Array[String],
+  new_names : Array[String],
+) -> DataFrame {
+  if old_names.length() != new_names.length() {
+    abort("列名数量不匹配")
+  }
+  let new_columns = Array::make(self.n_cols(), "")
+  for i = 0; i < self.n_cols(); i = i + 1 {
+    new_columns[i] = self.columns[i]
+  }
+  for i = 0; i < old_names.length(); i = i + 1 {
+    let idx = self.find_column_index(old_names[i])
+    if idx == -1 {
+      abort("列名不存在: " + old_names[i])
+    }
+    new_columns[idx] = new_names[i]
+  }
+  DataFrame::new(new_columns, self.data)
+}
+
+///|
+/// 填充缺失值（NaN）
+pub fn DataFrame::fillna(self : DataFrame, value : Double) -> DataFrame {
+  let new_data = Array::make(self.n_rows(), [])
+  for i = 0; i < self.n_rows(); i = i + 1 {
+    let row = Array::make(self.n_cols(), 0.0)
+    for j = 0; j < self.n_cols(); j = j + 1 {
+      let v = self.data[i][j]
+      row[j] = if is_nan(v) { value } else { v }
+    }
+    new_data[i] = row
+  }
+  DataFrame::new(self.columns, new_data)
+}
+
+///|
+/// NaN 判断
+fn is_nan(value : Double) -> Bool {
+  value != value
+}
+
+///|
+/// 数值比较（支持 NaN）
+fn compare_values(a : Double, b : Double, ascending : Bool) -> Int {
+  let a_nan = is_nan(a)
+  let b_nan = is_nan(b)
+  if a_nan && b_nan {
+    return 0
+  }
+  if a_nan {
+    return if ascending { 1 } else { -1 }
+  }
+  if b_nan {
+    return if ascending { -1 } else { 1 }
+  }
+  if a == b {
+    return 0
+  }
+  if ascending {
+    if a < b {
+      -1
+    } else {
+      1
+    }
+  } else if a > b {
+    -1
+  } else {
+    1
   }
 }

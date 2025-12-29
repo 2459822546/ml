@@ -20,14 +20,25 @@ fn BatchIterator::new(Array[Array[Double]], Int) -> Self
 fn BatchIterator::next(Self) -> Array[Array[Double]]?
 fn BatchIterator::reset(Self) -> Unit
 
+pub struct ColumnStats {
+  count : Int
+  mean : Double
+  std : Double
+  min : Double
+  max : Double
+}
+
 pub struct DataFrame {
   columns : Array[String]
   mut data : Array[Array[Double]]
   mut index : Array[Int]
 }
 fn DataFrame::add_row(Self, Array[Double]) -> Unit
-fn DataFrame::describe(Self) -> Unit
+fn DataFrame::describe(Self) -> DataFrameStats
+fn DataFrame::drop(Self, Array[String]) -> Self
 fn DataFrame::empty(Array[String]) -> Self
+fn DataFrame::fillna(Self, Double) -> Self
+fn DataFrame::filter(Self, (Array[Double]) -> Bool) -> Self
 fn DataFrame::get_column(Self, String) -> Array[Double]
 fn DataFrame::get_column_by_index(Self, Int) -> Array[Double]
 fn DataFrame::get_columns(Self) -> Array[String]
@@ -36,12 +47,21 @@ fn DataFrame::head(Self, Int) -> Self
 fn DataFrame::n_cols(Self) -> Int
 fn DataFrame::n_rows(Self) -> Int
 fn DataFrame::new(Array[String], Array[Array[Double]]) -> Self
+fn DataFrame::rename(Self, Array[String], Array[String]) -> Self
 fn DataFrame::select(Self, Array[String]) -> Self
 fn DataFrame::set(Self, Int, Int, Double) -> Unit
 fn DataFrame::shape(Self) -> (Int, Int)
 fn DataFrame::slice(Self, Int, Int) -> Self
+fn DataFrame::sort(Self, String, ascending? : Bool) -> Self
 fn DataFrame::tail(Self, Int) -> Self
 fn DataFrame::to_array(Self) -> Array[Array[Double]]
+
+pub struct DataFrameStats {
+  n_rows : Int
+  n_cols : Int
+  columns : Array[String]
+  stats : Array[ColumnStats]
+}
 
 pub struct DataLoader {
   dataset : Dataset
