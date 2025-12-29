@@ -255,14 +255,21 @@ fn AutoTensor::flatten2d(Self) -> Self
 fn AutoTensor::from_other(Self, @math.Tensor, requires_grad? : Bool) -> Self
 fn AutoTensor::grad(Self) -> @math.Tensor
 fn AutoTensor::layernorm(Self, Self, Self, Double) -> Self
+fn AutoTensor::log_softmax(Self, axis? : Int) -> Self
+fn AutoTensor::logsumexp(Self, axis? : Int, keepdim? : Bool) -> Self
 fn AutoTensor::matmul(Self, Self) -> Self
 fn AutoTensor::maxpool2d(Self, Int, Int) -> Self
+fn AutoTensor::mean_axis(Self, Int, keepdim? : Bool) -> Self
 fn AutoTensor::mul(Self, Self) -> Self
 fn AutoTensor::new(@math.Tensor, requires_grad? : Bool) -> Self
+fn AutoTensor::permute(Self, Array[Int]) -> Self
 fn AutoTensor::relu(Self) -> Self
+fn AutoTensor::reshape(Self, Array[Int]) -> Self
 fn AutoTensor::softmax_cross_entropy(Self, Array[Int]) -> Self
 fn AutoTensor::sub(Self, Self) -> Self
 fn AutoTensor::sum(Self) -> Self
+fn AutoTensor::sum_axis(Self, Int, keepdim? : Bool) -> Self
+fn AutoTensor::transpose(Self, axes? : Array[Int]) -> Self
 fn AutoTensor::value(Self) -> @math.Tensor
 impl Add for AutoTensor
 impl Mul for AutoTensor
@@ -361,14 +368,20 @@ fn ComputationGraph::embedding(Self, Int, @math.Tensor) -> Int
 fn ComputationGraph::flatten2d(Self, Int) -> Int
 fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
 fn ComputationGraph::layernorm(Self, Int, Int, Int, Double) -> Int
+fn ComputationGraph::log_softmax(Self, Int, Int) -> Int
+fn ComputationGraph::logsumexp(Self, Int, Int, keepdim? : Bool) -> Int
 fn ComputationGraph::matmul(Self, Int, Int) -> Int
 fn ComputationGraph::maxpool2d(Self, Int, Int, Int) -> Int
+fn ComputationGraph::mean_axis(Self, Int, Int, keepdim? : Bool) -> Int
 fn ComputationGraph::mul(Self, Int, Int) -> Int
 fn ComputationGraph::new() -> Self
 fn ComputationGraph::relu(Self, Int) -> Int
+fn ComputationGraph::reshape(Self, Int, Array[Int]) -> Int
 fn ComputationGraph::softmax_cross_entropy(Self, Int, Array[Int]) -> Int
 fn ComputationGraph::sub(Self, Int, Int) -> Int
 fn ComputationGraph::sum(Self, Int) -> Int
+fn ComputationGraph::sum_axis(Self, Int, Int, keepdim? : Bool) -> Int
+fn ComputationGraph::transpose(Self, Int, Array[Int]) -> Int
 fn ComputationGraph::value_of(Self, Int) -> @math.Tensor
 
 pub struct Conv2d {
@@ -603,6 +616,8 @@ pub enum Op {
   MatMul
   AddBias
   Sum
+  SumAxis
+  MeanAxis
   Dropout
   Dropout2d
   BatchNorm1d
@@ -614,6 +629,10 @@ pub enum Op {
   AvgPool2d
   Flatten2d
   SoftmaxCrossEntropy
+  Reshape
+  Transpose
+  LogSoftmax
+  LogSumExp
 }
 
 pub struct OptimParam {
