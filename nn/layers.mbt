@@ -447,3 +447,256 @@ pub fn Embedding::forward(
   }
   @math.Matrix::new(out)
 }
+
+///|
+/// Conv2d
+pub struct Conv2d {
+  mut weight : @math.Tensor
+  mut bias : @math.Tensor
+  stride : Int
+  padding : Int
+}
+
+///|
+pub fn Conv2d::new(
+  in_channels : Int,
+  out_channels : Int,
+  kernel_size : Int,
+  stride? : Int = 1,
+  padding? : Int = 0,
+  seed? : Int = 42,
+) -> Conv2d {
+  if in_channels <= 0 || out_channels <= 0 || kernel_size <= 0 {
+    abort("in/out_channels 与 kernel_size 必须大于 0")
+  }
+  let mut rng = seed
+  let scale = (1.0 / (in_channels * kernel_size * kernel_size).to_double()).sqrt()
+  let total = out_channels * in_channels * kernel_size * kernel_size
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    rng = (1103515245 * rng + 12345) & 0x7fffffff
+    let r = rng.to_double() / (0x7fffffff).to_double()
+    data[i] = (r * 2.0 - 1.0) * scale
+  }
+  let weight = @math.Tensor::new(data, [
+    out_channels, in_channels, kernel_size, kernel_size,
+  ])
+  let bias = @math.Tensor::zeros([out_channels])
+  { weight, bias, stride, padding }
+}
+
+///|
+pub fn Conv2d::set_params(
+  self : Conv2d,
+  weight : @math.Tensor,
+  bias : @math.Tensor,
+) -> Unit {
+  if weight.get_shape().length() != 4 || bias.get_shape().length() != 1 {
+    abort("conv2d 参数形状不匹配")
+  }
+  self.weight = weight
+  self.bias = bias
+}
+
+///|
+pub fn Conv2d::forward(self : Conv2d, x : @math.Tensor) -> @math.Tensor {
+  let shape_x = x.get_shape()
+  let shape_w = self.weight.get_shape()
+  if shape_x.length() != 4 || shape_w.length() != 4 {
+    abort("conv2d 仅支持 4D 张量")
+  }
+  let n = shape_x[0]
+  let cin = shape_x[1]
+  let h = shape_x[2]
+  let wi = shape_x[3]
+  let cout = shape_w[0]
+  let cin_w = shape_w[1]
+  let kh = shape_w[2]
+  let kw = shape_w[3]
+  if cin != cin_w {
+    abort("conv2d 输入通道不匹配")
+  }
+  let out_h = (h + 2 * self.padding - kh) / self.stride + 1
+  let out_w = (wi + 2 * self.padding - kw) / self.stride + 1
+  let out = @math.Tensor::zeros([n, cout, out_h, out_w])
+  for ni = 0; ni < n; ni = ni + 1 {
+    for co = 0; co < cout; co = co + 1 {
+      for oh = 0; oh < out_h; oh = oh + 1 {
+        for ow = 0; ow < out_w; ow = ow + 1 {
+          let mut sum = self.bias.get([co])
+          for ci = 0; ci < cin; ci = ci + 1 {
+            for khi = 0; khi < kh; khi = khi + 1 {
+              for kwi = 0; kwi < kw; kwi = kwi + 1 {
+                let ih = oh * self.stride + khi - self.padding
+                let iw = ow * self.stride + kwi - self.padding
+                if ih >= 0 && ih < h && iw >= 0 && iw < wi {
+                  sum = sum +
+                    x.get([ni, ci, ih, iw]) *
+                    self.weight.get([co, ci, khi, kwi])
+                }
+              }
+            }
+          }
+          out.set([ni, co, oh, ow], sum)
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
+/// BatchNorm2d
+pub struct BatchNorm2d {
+  gamma : Array[Double]
+  beta : Array[Double]
+  running_mean : Array[Double]
+  running_var : Array[Double]
+  momentum : Double
+  eps : Double
+}
+
+///|
+pub fn BatchNorm2d::new(
+  num_features : Int,
+  momentum? : Double = 0.9,
+  eps? : Double = 1.0e-5,
+) -> BatchNorm2d {
+  if num_features <= 0 {
+    abort("num_features 必须大于 0")
+  }
+  if momentum < 0.0 || momentum > 1.0 {
+    abort("momentum 必须在 [0,1]")
+  }
+  let gamma = Array::make(num_features, 1.0)
+  let beta = Array::make(num_features, 0.0)
+  let running_mean = Array::make(num_features, 0.0)
+  let running_var = Array::make(num_features, 1.0)
+  { gamma, beta, running_mean, running_var, momentum, eps }
+}
+
+///|
+pub fn BatchNorm2d::forward(
+  self : BatchNorm2d,
+  x : @math.Tensor,
+  train? : Bool = true,
+) -> @math.Tensor {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("batchnorm2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  if c != self.gamma.length() {
+    abort("输入通道不匹配")
+  }
+  let mean = Array::make(c, 0.0)
+  let variance = Array::make(c, 0.0)
+  if train {
+    for ci = 0; ci < c; ci = ci + 1 {
+      let mut sum = 0.0
+      for ni = 0; ni < n; ni = ni + 1 {
+        for hi = 0; hi < h; hi = hi + 1 {
+          for wi = 0; wi < w; wi = wi + 1 {
+            sum = sum + x.get([ni, ci, hi, wi])
+          }
+        }
+      }
+      mean[ci] = sum / (n * h * w).to_double()
+    }
+    for ci = 0; ci < c; ci = ci + 1 {
+      let mut sum = 0.0
+      for ni = 0; ni < n; ni = ni + 1 {
+        for hi = 0; hi < h; hi = hi + 1 {
+          for wi = 0; wi < w; wi = wi + 1 {
+            let diff = x.get([ni, ci, hi, wi]) - mean[ci]
+            sum = sum + diff * diff
+          }
+        }
+      }
+      variance[ci] = sum / (n * h * w).to_double()
+    }
+    for ci = 0; ci < c; ci = ci + 1 {
+      self.running_mean[ci] = self.momentum * self.running_mean[ci] +
+        (1.0 - self.momentum) * mean[ci]
+      self.running_var[ci] = self.momentum * self.running_var[ci] +
+        (1.0 - self.momentum) * variance[ci]
+    }
+  } else {
+    for ci = 0; ci < c; ci = ci + 1 {
+      mean[ci] = self.running_mean[ci]
+      variance[ci] = self.running_var[ci]
+    }
+  }
+  let out = @math.Tensor::zeros([n, c, h, w])
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      let inv_std = 1.0 / (variance[ci] + self.eps).sqrt()
+      for hi = 0; hi < h; hi = hi + 1 {
+        for wi = 0; wi < w; wi = wi + 1 {
+          let norm = (x.get([ni, ci, hi, wi]) - mean[ci]) * inv_std
+          out.set([ni, ci, hi, wi], norm * self.gamma[ci] + self.beta[ci])
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
+/// Dropout2d
+pub struct Dropout2d {
+  rate : Double
+  mut seed : Int
+}
+
+///|
+pub fn Dropout2d::new(rate : Double, seed? : Int = 42) -> Dropout2d {
+  if rate < 0.0 || rate >= 1.0 {
+    abort("rate 必须在 [0,1)")
+  }
+  { rate, seed }
+}
+
+///|
+pub fn Dropout2d::forward(
+  self : Dropout2d,
+  x : @math.Tensor,
+  train? : Bool = true,
+) -> @math.Tensor {
+  if not(train) || self.rate == 0.0 {
+    return x
+  }
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("dropout2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let out = @math.Tensor::zeros([n, c, h, w])
+  let keep = 1.0 - self.rate
+  let scale = 1.0 / keep
+  let mut rng = self.seed
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      rng = (1103515245 * rng + 12345) & 0x7fffffff
+      let r = rng.to_double() / (0x7fffffff).to_double()
+      let keep_channel = r < keep
+      for hi = 0; hi < h; hi = hi + 1 {
+        for wi = 0; wi < w; wi = wi + 1 {
+          if keep_channel {
+            out.set([ni, ci, hi, wi], x.get([ni, ci, hi, wi]) * scale)
+          } else {
+            out.set([ni, ci, hi, wi], 0.0)
+          }
+        }
+      }
+    }
+  }
+  self.seed = rng
+  out
+}
