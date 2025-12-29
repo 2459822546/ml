@@ -9,6 +9,20 @@ pub struct Parameter {
 }
 
 ///|
+fn module_matrix_to_tensor(m : @math.Matrix) -> @math.Tensor {
+  let (rows, cols) = m.shape()
+  let data = Array::make(rows * cols, 0.0)
+  let mut idx = 0
+  for i = 0; i < rows; i = i + 1 {
+    for j = 0; j < cols; j = j + 1 {
+      data[idx] = m.get(i, j)
+      idx = idx + 1
+    }
+  }
+  @math.Tensor::new(data, [rows, cols])
+}
+
+///|
 pub fn Parameter::new(
   data : @math.Tensor,
   requires_grad? : Bool = true,
