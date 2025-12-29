@@ -57,11 +57,28 @@ test "loss forward values" {
   assert_true((mse - 0.125).abs() < 1.0e-9)
   let huber = huber_loss([1.0], [2.5], delta=1.0)
   assert_true((huber - 1.0).abs() < 1.0e-9)
+  let mae = mae_loss([1.0, 2.0], [2.0, 1.0])
+  assert_true((mae - 1.0).abs() < 1.0e-9)
+  let sl1 = smooth_l1_loss([1.0], [3.0], beta=1.0)
+  assert_true((sl1 - 1.5).abs() < 1.0e-9)
   let bce = binary_cross_entropy([1.0, 0.0], [0.9, 0.1])
   assert_true(bce < 0.25)
+  let mbce = multilabel_binary_cross_entropy([[1.0, 0.0], [0.0, 1.0]], [
+    [0.9, 0.1],
+    [0.2, 0.8],
+  ])
+  assert_true(mbce < 0.3)
+  let focal = focal_loss_binary([1.0, 0.0], [0.9, 0.1])
+  assert_true(focal < 0.05)
   let logits = @math.Matrix::new([[2.0, 0.0]])
   let ce = cross_entropy([0], logits)
   assert_true(ce < 0.2)
+  let ls = label_smoothing_cross_entropy([0], logits, smoothing=0.1)
+  assert_true(ls > ce)
+  let kl = kl_divergence([0.7, 0.3], [0.6, 0.4])
+  assert_true(kl > 0.0)
+  let hinge = hinge_loss([1.0, -1.0], [2.0, -0.5])
+  assert_true((hinge - 0.25).abs() < 1.0e-9)
 }
 
 ///|

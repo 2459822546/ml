@@ -20,21 +20,43 @@ fn activation_forward_tensor(@math.Tensor, Activation) -> @math.Tensor
 
 fn binary_cross_entropy(Array[Double], Array[Double], eps? : Double) -> Double
 
+fn clip_grad_norm(Array[OptimParam], Double, eps? : Double) -> Double
+
+fn clip_grad_value(Array[OptimParam], Double) -> Unit
+
 fn cosine_decay(Double, Double, Int, Int) -> Double
 
 fn cross_entropy(Array[Int], @math.Matrix) -> Double
 
+fn early_stopping_max(Int, min_delta? : Double) -> EarlyStopping
+
+fn early_stopping_min(Int, min_delta? : Double) -> EarlyStopping
+
+fn focal_loss_binary(Array[Double], Array[Double], gamma? : Double, alpha? : Double, eps? : Double) -> Double
+
+fn hinge_loss(Array[Double], Array[Double]) -> Double
+
 fn huber_loss(Array[Double], Array[Double], delta? : Double) -> Double
+
+fn kl_divergence(Array[Double], Array[Double]) -> Double
 
 fn l1_penalty(Array[Double], Double) -> Double
 
 fn l2_penalty(Array[Double], Double) -> Double
 
+fn label_smoothing_cross_entropy(Array[Int], @math.Matrix, smoothing? : Double) -> Double
+
 fn linear_rand_init(Int, Int, scale? : Double, seed? : Int) -> Linear
 
 fn linear_warmup(Double, Int, Int) -> Double
 
+fn mae_loss(Array[Double], Array[Double]) -> Double
+
+fn mlp_train_loop(MLP, @data.DataLoader, Int, (MLP, Array[Array[Double]], Array[Double], Int, Int) -> MLP) -> MLP
+
 fn mse_loss(Array[Double], Array[Double]) -> Double
+
+fn multilabel_binary_cross_entropy(Array[Array[Double]], Array[Array[Double]], eps? : Double) -> Double
 
 fn optimizer_adagrad(Adagrad) -> Optimizer
 
@@ -51,6 +73,8 @@ fn optimizer_set_lr(Optimizer, Double) -> Optimizer
 fn optimizer_sgd(SGD) -> Optimizer
 
 fn optimizer_step(Optimizer, OptimParam) -> Optimizer
+
+fn smooth_l1_loss(Array[Double], Array[Double], beta? : Double) -> Double
 
 fn step_decay(Double, Double, Int, Int) -> Double
 
