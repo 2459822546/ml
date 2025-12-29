@@ -303,22 +303,205 @@ pub fn Tensor::reshape(self : Tensor, new_shape : Array[Int]) -> Tensor {
 }
 
 ///|
-/// 转置（只支持2D）
-pub fn Tensor::transpose(self : Tensor) -> Tensor {
-  if self.ndim() != 2 {
-    abort("转置只支持2D张量")
+/// 转置（支持高阶维度）
+pub fn Tensor::transpose(self : Tensor, axes? : Array[Int] = []) -> Tensor {
+  let ndim = self.ndim()
+  if ndim == 0 {
+    return self.copy()
   }
-  let rows = self.shape[0]
-  let cols = self.shape[1]
+  let perm = if axes.length() == 0 {
+    let p = Array::make(ndim, 0)
+    for i = 0; i < ndim; i = i + 1 {
+      p[i] = ndim - 1 - i
+    }
+    p
+  } else {
+    axes
+  }
+  if perm.length() != ndim {
+    abort("转置轴维度不匹配")
+  }
+  let seen = Array::make(ndim, false)
+  for i = 0; i < perm.length(); i = i + 1 {
+    let ax = perm[i]
+    if ax < 0 || ax >= ndim {
+      abort("转置轴越界")
+    }
+    if seen[ax] {
+      abort("转置轴重复")
+    }
+    seen[ax] = true
+  }
+  let new_shape = Array::make(ndim, 0)
+  for i = 0; i < ndim; i = i + 1 {
+    new_shape[i] = self.shape[perm[i]]
+  }
+  let new_strides = compute_strides_for_shape(new_shape)
   let new_data = Array::make(self.size, 0.0)
-  for i = 0; i < rows; i = i + 1 {
-    for j = 0; j < cols; j = j + 1 {
-      let old_idx = i * cols + j
-      let new_idx = j * rows + i
-      new_data[new_idx] = self.data[old_idx]
+  for i = 0; i < self.size; i = i + 1 {
+    let old_indices = indices_from_flat(self.shape, self.strides, i)
+    let new_indices = Array::make(ndim, 0)
+    for j = 0; j < ndim; j = j + 1 {
+      new_indices[j] = old_indices[perm[j]]
+    }
+    let mut new_idx = 0
+    for j = 0; j < ndim; j = j + 1 {
+      new_idx = new_idx + new_indices[j] * new_strides[j]
+    }
+    new_data[new_idx] = self.data[i]
+  }
+  Tensor::new(new_data, new_shape)
+}
+
+///|
+/// 沿指定轴切片 [start, end)
+pub fn Tensor::slice(
+  self : Tensor,
+  axis : Int,
+  start : Int,
+  end? : Int = -1,
+) -> Tensor {
+  if axis < 0 || axis >= self.ndim() {
+    abort("轴索引越界")
+  }
+  let axis_len = self.shape[axis]
+  let mut stop = end
+  if stop == -1 {
+    stop = axis_len
+  }
+  if start < 0 || stop < start || stop > axis_len {
+    abort("切片范围非法")
+  }
+  let new_shape = Array::make(self.shape.length(), 0)
+  for i = 0; i < self.shape.length(); i = i + 1 {
+    new_shape[i] = self.shape[i]
+  }
+  new_shape[axis] = stop - start
+  let new_strides = compute_strides_for_shape(new_shape)
+  let mut new_size = 1
+  for i = 0; i < new_shape.length(); i = i + 1 {
+    new_size = new_size * new_shape[i]
+  }
+  let new_data = Array::make(new_size, 0.0)
+  for idx = 0; idx < new_size; idx = idx + 1 {
+    let out_indices = indices_from_flat(new_shape, new_strides, idx)
+    let mut in_idx = 0
+    for d = 0; d < self.ndim(); d = d + 1 {
+      let v = if d == axis { out_indices[d] + start } else { out_indices[d] }
+      in_idx = in_idx + v * self.strides[d]
+    }
+    new_data[idx] = self.data[in_idx]
+  }
+  Tensor::new(new_data, new_shape)
+}
+
+///|
+/// 沿指定轴拼接
+pub fn Tensor::concat(axis : Int, tensors : Array[Tensor]) -> Tensor {
+  if tensors.length() == 0 {
+    abort("拼接张量不能为空")
+  }
+  let ref0 = tensors[0]
+  if axis < 0 || axis >= ref0.ndim() {
+    abort("轴索引越界")
+  }
+  let mut total_axis = 0
+  for i = 0; i < tensors.length(); i = i + 1 {
+    let t = tensors[i]
+    if t.ndim() != ref0.ndim() {
+      abort("张量维度不一致")
+    }
+    for d = 0; d < ref0.ndim(); d = d + 1 {
+      if d != axis && t.shape[d] != ref0.shape[d] {
+        abort("张量形状不匹配")
+      }
+    }
+    total_axis = total_axis + t.shape[axis]
+  }
+  let new_shape = Array::make(ref0.ndim(), 0)
+  for d = 0; d < ref0.ndim(); d = d + 1 {
+    new_shape[d] = if d == axis { total_axis } else { ref0.shape[d] }
+  }
+  let out_strides = compute_strides_for_shape(new_shape)
+  let mut new_size = 1
+  for d = 0; d < new_shape.length(); d = d + 1 {
+    new_size = new_size * new_shape[d]
+  }
+  let new_data = Array::make(new_size, 0.0)
+  let mut offset = 0
+  for i = 0; i < tensors.length(); i = i + 1 {
+    let t = tensors[i]
+    for idx = 0; idx < t.size; idx = idx + 1 {
+      let old_indices = indices_from_flat(t.shape, t.strides, idx)
+      let mut new_idx = 0
+      for d = 0; d < t.ndim(); d = d + 1 {
+        let v = if d == axis { old_indices[d] + offset } else { old_indices[d] }
+        new_idx = new_idx + v * out_strides[d]
+      }
+      new_data[new_idx] = t.data[idx]
+    }
+    offset = offset + t.shape[axis]
+  }
+  Tensor::new(new_data, new_shape)
+}
+
+///|
+/// 沿指定新轴堆叠
+pub fn Tensor::stack(axis : Int, tensors : Array[Tensor]) -> Tensor {
+  if tensors.length() == 0 {
+    abort("堆叠张量不能为空")
+  }
+  let ref0 = tensors[0]
+  if axis < 0 || axis > ref0.ndim() {
+    abort("轴索引越界")
+  }
+  for i = 0; i < tensors.length(); i = i + 1 {
+    let t = tensors[i]
+    if t.ndim() != ref0.ndim() {
+      abort("张量维度不一致")
+    }
+    if not(ref0.shapes_equal(t)) {
+      abort("张量形状不匹配")
     }
   }
-  Tensor::new(new_data, [cols, rows])
+  let new_shape = Array::make(ref0.ndim() + 1, 0)
+  let mut old_pos = 0
+  for d = 0; d < new_shape.length(); d = d + 1 {
+    if d == axis {
+      new_shape[d] = tensors.length()
+    } else {
+      new_shape[d] = ref0.shape[old_pos]
+      old_pos = old_pos + 1
+    }
+  }
+  let out_strides = compute_strides_for_shape(new_shape)
+  let mut new_size = 1
+  for d = 0; d < new_shape.length(); d = d + 1 {
+    new_size = new_size * new_shape[d]
+  }
+  let new_data = Array::make(new_size, 0.0)
+  for i = 0; i < tensors.length(); i = i + 1 {
+    let t = tensors[i]
+    for idx = 0; idx < t.size; idx = idx + 1 {
+      let old_indices = indices_from_flat(t.shape, t.strides, idx)
+      let new_indices = Array::make(new_shape.length(), 0)
+      let mut in_pos = 0
+      for d = 0; d < new_shape.length(); d = d + 1 {
+        if d == axis {
+          new_indices[d] = i
+        } else {
+          new_indices[d] = old_indices[in_pos]
+          in_pos = in_pos + 1
+        }
+      }
+      let mut new_idx = 0
+      for d = 0; d < new_shape.length(); d = d + 1 {
+        new_idx = new_idx + new_indices[d] * out_strides[d]
+      }
+      new_data[new_idx] = t.data[idx]
+    }
+  }
+  Tensor::new(new_data, new_shape)
 }
 
 ///|
