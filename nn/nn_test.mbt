@@ -371,6 +371,31 @@ test "optimizer params step seq" {
 }
 
 ///|
+test "named parameters and buffers" {
+  let linear = LinearModule::new(2, 1, seed=1)
+  let bn = BatchNorm1d::new(1)
+  let seq = Sequential::new([module_linear(linear), module_batchnorm1d(bn)])
+  let params = seq.named_parameters()
+  match params.get("0.weight") {
+    Some(_) => ()
+    None => abort("缺少 0.weight")
+  }
+  match params.get("1.gamma") {
+    Some(_) => ()
+    None => abort("缺少 1.gamma")
+  }
+  let buffers = seq.named_buffers()
+  match buffers.get("1.running_mean") {
+    Some(_) => ()
+    None => abort("缺少 1.running_mean")
+  }
+  match buffers.get("1.running_var") {
+    Some(_) => ()
+    None => abort("缺少 1.running_var")
+  }
+}
+
+///|
 test "mlp forward logits" {
   let mlp = MLP::new(2, [3], 2, output_activation=act_softmax(), seed=1)
   let x = @math.Matrix::new([[0.0, 0.0], [1.0, 1.0]])

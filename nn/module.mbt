@@ -1215,6 +1215,52 @@ fn module_state_dict_add(
 }
 
 ///|
+fn module_state_dict_keys_into(
+  mod : Module,
+  prefix : String,
+  keys : Map[String, Bool],
+) -> Unit {
+  match mod {
+    Linear(_) => {
+      keys.set(module_state_dict_key(prefix, "weight"), true)
+      keys.set(module_state_dict_key(prefix, "bias"), true)
+    }
+    BatchNorm1d(_) => {
+      keys.set(module_state_dict_key(prefix, "gamma"), true)
+      keys.set(module_state_dict_key(prefix, "beta"), true)
+      keys.set(module_state_dict_key(prefix, "running_mean"), true)
+      keys.set(module_state_dict_key(prefix, "running_var"), true)
+    }
+    BatchNorm2d(_) => {
+      keys.set(module_state_dict_key(prefix, "gamma"), true)
+      keys.set(module_state_dict_key(prefix, "beta"), true)
+      keys.set(module_state_dict_key(prefix, "running_mean"), true)
+      keys.set(module_state_dict_key(prefix, "running_var"), true)
+    }
+    LayerNorm(_) => {
+      keys.set(module_state_dict_key(prefix, "gamma"), true)
+      keys.set(module_state_dict_key(prefix, "beta"), true)
+    }
+    Embedding(_) => keys.set(module_state_dict_key(prefix, "weight"), true)
+    Conv2d(_) => {
+      keys.set(module_state_dict_key(prefix, "weight"), true)
+      keys.set(module_state_dict_key(prefix, "bias"), true)
+    }
+    Sequential(s) =>
+      for i = 0; i < s.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_state_dict_keys_into(s.modules[i], sub_prefix, keys)
+      }
+    ModuleList(m) =>
+      for i = 0; i < m.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_state_dict_keys_into(m.modules[i], sub_prefix, keys)
+      }
+    _ => ()
+  }
+}
+
+///|
 fn module_state_dict_into(
   mod : Module,
   prefix : String,
@@ -1351,6 +1397,16 @@ pub fn module_load_state_dict(
   prefix? : String = "",
 ) -> Unit {
   let strict_val = strict
+  if strict_val && prefix == "" {
+    let expected = Map::new()
+    module_state_dict_keys_into(mod, prefix, expected)
+    for key in dict.keys() {
+      match expected.get(key) {
+        Some(_) => ()
+        None => abort("state_dict 多余键: " + key)
+      }
+    }
+  }
   match mod {
     Linear(m) => {
       match
@@ -1523,6 +1579,167 @@ pub fn module_load_state_dict(
 }
 
 ///|
+fn module_named_parameters_add(
+  dict : Map[String, Parameter],
+  key : String,
+  value : Parameter,
+) -> Unit {
+  dict.set(key, value)
+}
+
+///|
+fn module_named_parameters_into(
+  mod : Module,
+  prefix : String,
+  dict : Map[String, Parameter],
+) -> Unit {
+  match mod {
+    Linear(m) => {
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "weight"),
+        m.weight,
+      )
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "bias"),
+        m.bias,
+      )
+    }
+    BatchNorm1d(m) => {
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "gamma"),
+        m.gamma,
+      )
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "beta"),
+        m.beta,
+      )
+    }
+    BatchNorm2d(m) => {
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "gamma"),
+        m.gamma,
+      )
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "beta"),
+        m.beta,
+      )
+    }
+    LayerNorm(m) => {
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "gamma"),
+        m.gamma,
+      )
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "beta"),
+        m.beta,
+      )
+    }
+    Embedding(m) =>
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "weight"),
+        m.weight,
+      )
+    Conv2d(m) => {
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "weight"),
+        m.weight,
+      )
+      module_named_parameters_add(
+        dict,
+        module_state_dict_key(prefix, "bias"),
+        m.bias,
+      )
+    }
+    Sequential(s) =>
+      for i = 0; i < s.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_parameters_into(s.modules[i], sub_prefix, dict)
+      }
+    ModuleList(m) =>
+      for i = 0; i < m.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_parameters_into(m.modules[i], sub_prefix, dict)
+      }
+    _ => ()
+  }
+}
+
+///|
+pub fn module_named_parameters(
+  mod : Module,
+  prefix? : String = "",
+) -> Map[String, Parameter] {
+  let dict = Map::new()
+  module_named_parameters_into(mod, prefix, dict)
+  dict
+}
+
+///|
+fn module_named_buffers_into(
+  mod : Module,
+  prefix : String,
+  dict : Map[String, @math.Tensor],
+) -> Unit {
+  match mod {
+    BatchNorm1d(m) => {
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_mean"),
+        module_array_to_tensor(m.running_mean),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_var"),
+        module_array_to_tensor(m.running_var),
+      )
+    }
+    BatchNorm2d(m) => {
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_mean"),
+        module_array_to_tensor(m.running_mean),
+      )
+      module_state_dict_add(
+        dict,
+        module_state_dict_key(prefix, "running_var"),
+        module_array_to_tensor(m.running_var),
+      )
+    }
+    Sequential(s) =>
+      for i = 0; i < s.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_buffers_into(s.modules[i], sub_prefix, dict)
+      }
+    ModuleList(m) =>
+      for i = 0; i < m.modules.length(); i = i + 1 {
+        let sub_prefix = prefix + i.to_string() + "."
+        module_named_buffers_into(m.modules[i], sub_prefix, dict)
+      }
+    _ => ()
+  }
+}
+
+///|
+pub fn module_named_buffers(
+  mod : Module,
+  prefix? : String = "",
+) -> Map[String, @math.Tensor] {
+  let dict = Map::new()
+  module_named_buffers_into(mod, prefix, dict)
+  dict
+}
+
+///|
 pub fn Sequential::state_dict(self : Sequential) -> Map[String, @math.Tensor] {
   module_state_dict(Sequential(self))
 }
@@ -1537,6 +1754,20 @@ pub fn Sequential::load_state_dict(
 }
 
 ///|
+pub fn Sequential::named_parameters(
+  self : Sequential,
+) -> Map[String, Parameter] {
+  module_named_parameters(Sequential(self))
+}
+
+///|
+pub fn Sequential::named_buffers(
+  self : Sequential,
+) -> Map[String, @math.Tensor] {
+  module_named_buffers(Sequential(self))
+}
+
+///|
 pub fn ModuleList::state_dict(self : ModuleList) -> Map[String, @math.Tensor] {
   module_state_dict(ModuleList(self))
 }
@@ -1548,4 +1779,18 @@ pub fn ModuleList::load_state_dict(
   strict? : Bool = true,
 ) -> Unit {
   module_load_state_dict(ModuleList(self), dict, strict~)
+}
+
+///|
+pub fn ModuleList::named_parameters(
+  self : ModuleList,
+) -> Map[String, Parameter] {
+  module_named_parameters(ModuleList(self))
+}
+
+///|
+pub fn ModuleList::named_buffers(
+  self : ModuleList,
+) -> Map[String, @math.Tensor] {
+  module_named_buffers(ModuleList(self))
 }
