@@ -515,6 +515,9 @@ pub enum Op {
   LayerNorm
   Embedding
   Conv2d
+  MaxPool2d
+  AvgPool2d
+  Flatten2d
 }
 
 ///|
@@ -752,6 +755,35 @@ pub fn AutoTensor::conv2d(
 ) -> AutoTensor {
   let g = self.graph
   let id = g.conv2d(self.id, weight.id, bias.id, stride, padding)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::maxpool2d(
+  self : AutoTensor,
+  kernel : Int,
+  stride : Int,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.maxpool2d(self.id, kernel, stride)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::avgpool2d(
+  self : AutoTensor,
+  kernel : Int,
+  stride : Int,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.avgpool2d(self.id, kernel, stride)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::flatten2d(self : AutoTensor) -> AutoTensor {
+  let g = self.graph
+  let id = g.flatten2d(self.id)
   { graph: g, id }
 }
 
@@ -1125,6 +1157,78 @@ pub fn ComputationGraph::conv2d(
     requires_grad: true,
     aux_tensors: [],
     aux_scalars: [stride.to_double(), padding.to_double()],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::maxpool2d(
+  self : ComputationGraph,
+  x : Int,
+  kernel : Int,
+  stride : Int,
+) -> Int {
+  let vx = self.nodes[x].value
+  let (out, idx_h, idx_w) = tensor_maxpool2d(vx, kernel, stride)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: MaxPool2d,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [idx_h, idx_w],
+    aux_scalars: [kernel.to_double(), stride.to_double()],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::avgpool2d(
+  self : ComputationGraph,
+  x : Int,
+  kernel : Int,
+  stride : Int,
+) -> Int {
+  let vx = self.nodes[x].value
+  let out = tensor_avgpool2d(vx, kernel, stride)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: AvgPool2d,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [kernel.to_double(), stride.to_double()],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::flatten2d(self : ComputationGraph, x : Int) -> Int {
+  let vx = self.nodes[x].value
+  let shape = vx.get_shape()
+  if shape.length() != 4 {
+    abort("flatten2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let out = tensor_reshape(vx, [n, c * h * w])
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Flatten2d,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [tensor_shape_to_tensor(shape)],
+    aux_scalars: [],
     aux_bool: false,
   })
   self.nodes.length() - 1
