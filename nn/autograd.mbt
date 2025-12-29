@@ -905,8 +905,11 @@ pub fn ComputationGraph::backward_with_grad(
       }
       BatchNorm1d => {
         let g = node.grad
-        let p = node.parents[0]
-        let x = self.nodes[p].value
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        let p2 = node.parents[2]
+        let x = self.nodes[p0].value
+        let gamma = self.nodes[p1].value
         let shape = x.get_shape()
         if shape.length() != 2 {
           abort("batchnorm1d 仅支持 2D 张量")
@@ -915,9 +918,10 @@ pub fn ComputationGraph::backward_with_grad(
         let m = shape[1]
         let mean = node.aux_tensors[0]
         let variance = node.aux_tensors[1]
-        let gamma = node.aux_tensors[2]
         let eps = node.aux_scalars[0]
         let grad_x = @math.Tensor::zeros([n, m])
+        let grad_gamma = @math.Tensor::zeros([m])
+        let grad_beta = @math.Tensor::zeros([m])
         for j = 0; j < m; j = j + 1 {
           let mean_j = mean.get([j])
           let var_j = variance.get([j])
@@ -926,13 +930,21 @@ pub fn ComputationGraph::backward_with_grad(
             let mut sum_dxhat = 0.0
             let mut sum_dxhat_xmu = 0.0
             let mut sum_xmu = 0.0
+            let mut sum_dy = 0.0
+            let mut sum_dy_xhat = 0.0
             for i = 0; i < n; i = i + 1 {
               let xmu = x.get([i, j]) - mean_j
               sum_xmu = sum_xmu + xmu
-              let dxhat = g.get([i, j]) * gamma.get([j])
+              let dy = g.get([i, j])
+              let xhat = xmu * inv_std
+              sum_dy = sum_dy + dy
+              sum_dy_xhat = sum_dy_xhat + dy * xhat
+              let dxhat = dy * gamma.get([j])
               sum_dxhat = sum_dxhat + dxhat
               sum_dxhat_xmu = sum_dxhat_xmu + dxhat * xmu
             }
+            grad_gamma.set([j], grad_gamma.get([j]) + sum_dy_xhat)
+            grad_beta.set([j], grad_beta.get([j]) + sum_dy)
             let inv_std3 = inv_std * inv_std * inv_std
             let dvar = sum_dxhat_xmu * -0.5 * inv_std3
             let dmu = sum_dxhat * -inv_std +
@@ -946,18 +958,31 @@ pub fn ComputationGraph::backward_with_grad(
               grad_x.set([i, j], grad_x.get([i, j]) + dx)
             }
           } else {
+            let mut sum_dy = 0.0
+            let mut sum_dy_xhat = 0.0
             for i = 0; i < n; i = i + 1 {
-              let dx = g.get([i, j]) * gamma.get([j]) * inv_std
+              let dy = g.get([i, j])
+              let xhat = (x.get([i, j]) - mean_j) * inv_std
+              sum_dy = sum_dy + dy
+              sum_dy_xhat = sum_dy_xhat + dy * xhat
+              let dx = dy * gamma.get([j]) * inv_std
               grad_x.set([i, j], grad_x.get([i, j]) + dx)
             }
+            grad_gamma.set([j], grad_gamma.get([j]) + sum_dy_xhat)
+            grad_beta.set([j], grad_beta.get([j]) + sum_dy)
           }
         }
-        tensor_add_inplace(self.nodes[p].grad, grad_x)
+        tensor_add_inplace(self.nodes[p0].grad, grad_x)
+        tensor_add_inplace(self.nodes[p1].grad, grad_gamma)
+        tensor_add_inplace(self.nodes[p2].grad, grad_beta)
       }
       LayerNorm => {
         let g = node.grad
-        let p = node.parents[0]
-        let x = self.nodes[p].value
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        let p2 = node.parents[2]
+        let x = self.nodes[p0].value
+        let gamma = self.nodes[p1].value
         let shape = x.get_shape()
         if shape.length() != 2 {
           abort("layernorm 仅支持 2D 张量")
@@ -966,9 +991,10 @@ pub fn ComputationGraph::backward_with_grad(
         let m = shape[1]
         let mean = node.aux_tensors[0]
         let variance = node.aux_tensors[1]
-        let gamma = node.aux_tensors[2]
         let eps = node.aux_scalars[0]
         let grad_x = @math.Tensor::zeros([n, m])
+        let grad_gamma = @math.Tensor::zeros([m])
+        let grad_beta = @math.Tensor::zeros([m])
         for i = 0; i < n; i = i + 1 {
           let mean_i = mean.get([i])
           let var_i = variance.get([i])
@@ -976,10 +1002,16 @@ pub fn ComputationGraph::backward_with_grad(
           let mut sum_dxhat = 0.0
           let mut sum_dxhat_xmu = 0.0
           let mut sum_xmu = 0.0
+          let mut sum_dy = 0.0
+          let mut sum_dy_xhat = 0.0
           for j = 0; j < m; j = j + 1 {
             let xmu = x.get([i, j]) - mean_i
             sum_xmu = sum_xmu + xmu
-            let dxhat = g.get([i, j]) * gamma.get([j])
+            let dy = g.get([i, j])
+            let xhat = xmu * inv_std
+            sum_dy = sum_dy + dy
+            sum_dy_xhat = sum_dy_xhat + dy * xhat
+            let dxhat = dy * gamma.get([j])
             sum_dxhat = sum_dxhat + dxhat
             sum_dxhat_xmu = sum_dxhat_xmu + dxhat * xmu
           }
@@ -994,8 +1026,32 @@ pub fn ComputationGraph::backward_with_grad(
               dmu / m.to_double()
             grad_x.set([i, j], grad_x.get([i, j]) + dx)
           }
+          for j = 0; j < m; j = j + 1 {
+            let xhat = (x.get([i, j]) - mean_i) * inv_std
+            grad_gamma.set([j], grad_gamma.get([j]) + g.get([i, j]) * xhat)
+            grad_beta.set([j], grad_beta.get([j]) + g.get([i, j]))
+          }
         }
-        tensor_add_inplace(self.nodes[p].grad, grad_x)
+        tensor_add_inplace(self.nodes[p0].grad, grad_x)
+        tensor_add_inplace(self.nodes[p1].grad, grad_gamma)
+        tensor_add_inplace(self.nodes[p2].grad, grad_beta)
+      }
+      Embedding => {
+        let g = node.grad
+        let weight_id = node.parents[0]
+        let w = self.nodes[weight_id].value
+        let shape_w = w.get_shape()
+        let indices = node.aux_tensors[0]
+        let n = indices.total_size()
+        let dim = shape_w[1]
+        let grad_w = @math.Tensor::zeros([shape_w[0], dim])
+        for i = 0; i < n; i = i + 1 {
+          let row = indices.get([i]).to_int()
+          for j = 0; j < dim; j = j + 1 {
+            grad_w.set([row, j], grad_w.get([row, j]) + g.get([i, j]))
+          }
+        }
+        tensor_add_inplace(self.nodes[weight_id].grad, grad_w)
       }
     }
   }
