@@ -202,6 +202,27 @@ test "conv2d forward and grads" {
 }
 
 ///|
+test "pooling and flatten2d" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0, 3.0, 4.0], [1, 1, 2, 2]))
+  let maxp = MaxPool2dModule::new(2)
+  let avgp = AvgPool2dModule::new(2)
+  let flat = Flatten2dModule::new()
+  let y_max = maxp.forward(x)
+  let y_avg = avgp.forward(x)
+  let y_flat = flat.forward(x)
+  assert_eq(y_max.value().get([0, 0, 0, 0]), 4.0)
+  assert_true((y_avg.value().get([0, 0, 0, 0]) - 2.5).abs() < 1.0e-9)
+  let shape = y_flat.value().get_shape()
+  assert_eq(shape[0], 1)
+  assert_eq(shape[1], 4)
+  let loss = y_max.sum()
+  loss.backward()
+  let gx = x.grad()
+  assert_eq(gx.get([0, 0, 1, 1]), 1.0)
+  assert_eq(gx.get([0, 0, 0, 0]), 0.0)
+}
+
+///|
 test "autotensor operators" {
   let a = AutoTensor::new(@math.Tensor::from_vector(@math.Vector::new([2.0])))
   let b = a.from_other(@math.Tensor::from_vector(@math.Vector::new([3.0])))
