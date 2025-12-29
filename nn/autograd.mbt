@@ -2557,6 +2557,58 @@ pub fn ComputationGraph::backward_with_grad(
         }
         tensor_add_inplace(self.nodes[p].grad, grad_logits)
       }
+      NLLLoss => {
+        let g = node.grad
+        let p = node.parents[0]
+        let labels = node.aux_tensors[0]
+        let shape = self.nodes[p].value.get_shape()
+        let n = shape[0]
+        let c = shape[1]
+        let grad_logp = @math.Tensor::zeros([n, c])
+        let scale = -g.get([0]) / n.to_double()
+        for i = 0; i < n; i = i + 1 {
+          let cls = labels.get([i]).to_int()
+          grad_logp.set([i, cls], scale)
+        }
+        tensor_add_inplace(self.nodes[p].grad, grad_logp)
+      }
+      MSELoss => {
+        let g = node.grad
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        let v0 = self.nodes[p0].value
+        let v1 = self.nodes[p1].value
+        let diff = tensor_sub(v0, v1)
+        let total = diff.total_size()
+        let scale = 2.0 * g.get([0]) / total.to_double()
+        let grad_full = tensor_scale(diff, scale)
+        let grad0 = tensor_reduce_to_shape(grad_full, v0.get_shape())
+        let grad1 = tensor_reduce_to_shape(
+          tensor_neg(grad_full),
+          v1.get_shape(),
+        )
+        tensor_add_inplace(self.nodes[p0].grad, grad0)
+        tensor_add_inplace(self.nodes[p1].grad, grad1)
+      }
+      MAELoss => {
+        let g = node.grad
+        let p0 = node.parents[0]
+        let p1 = node.parents[1]
+        let v0 = self.nodes[p0].value
+        let v1 = self.nodes[p1].value
+        let diff = tensor_sub(v0, v1)
+        let total = diff.total_size()
+        let scale = g.get([0]) / total.to_double()
+        let sign = tensor_sign(diff)
+        let grad_full = tensor_scale(sign, scale)
+        let grad0 = tensor_reduce_to_shape(grad_full, v0.get_shape())
+        let grad1 = tensor_reduce_to_shape(
+          tensor_neg(grad_full),
+          v1.get_shape(),
+        )
+        tensor_add_inplace(self.nodes[p0].grad, grad0)
+        tensor_add_inplace(self.nodes[p1].grad, grad1)
+      }
       Reshape => {
         let g = node.grad
         let p = node.parents[0]
