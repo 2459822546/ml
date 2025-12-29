@@ -894,6 +894,49 @@ pub fn optimizer_get_lr(opt : Optimizer) -> Double {
 }
 
 ///|
+pub fn optimizer_params_get_lr(opt : OptimizerParams) -> Double {
+  match opt {
+    SGD(s, _) => s.lr
+    Adam(a, _) => a.lr
+    AdamW(a, _) => a.lr
+    RMSProp(r, _) => r.lr
+    Adagrad(a, _) => a.lr
+  }
+}
+
+///|
+pub fn optimizer_params_set_lr(
+  opt : OptimizerParams,
+  lr : Double,
+) -> OptimizerParams {
+  if lr <= 0.0 {
+    abort("lr 必须大于 0")
+  }
+  match opt {
+    SGD(s, params) => {
+      s.lr = lr
+      SGD(s, params)
+    }
+    Adam(a, params) => {
+      a.lr = lr
+      Adam(a, params)
+    }
+    AdamW(a, params) => {
+      a.lr = lr
+      AdamW(a, params)
+    }
+    RMSProp(r, params) => {
+      r.lr = lr
+      RMSProp(r, params)
+    }
+    Adagrad(a, params) => {
+      a.lr = lr
+      Adagrad(a, params)
+    }
+  }
+}
+
+///|
 /// 统一 Parameter 优化器接口
 pub enum OptimizerParams {
   SGD(SGDParams, Array[Parameter])
@@ -1033,6 +1076,19 @@ pub fn OptimizerParams::zero_grad(self : OptimizerParams) -> OptimizerParams {
 ///|
 pub fn OptimizerParams::step(self : OptimizerParams) -> OptimizerParams {
   optimizer_params_step(self)
+}
+
+///|
+pub fn OptimizerParams::get_lr(self : OptimizerParams) -> Double {
+  optimizer_params_get_lr(self)
+}
+
+///|
+pub fn OptimizerParams::set_lr(
+  self : OptimizerParams,
+  lr : Double,
+) -> OptimizerParams {
+  optimizer_params_set_lr(self, lr)
 }
 
 ///|
