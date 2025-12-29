@@ -111,6 +111,54 @@ fn tensor_zeros_like(t : @math.Tensor) -> @math.Tensor {
 }
 
 ///|
+fn tensor_shape_to_tensor(shape : Array[Int]) -> @math.Tensor {
+  let data = Array::make(shape.length(), 0.0)
+  for i = 0; i < shape.length(); i = i + 1 {
+    data[i] = shape[i].to_double()
+  }
+  @math.Tensor::new(data, [shape.length()])
+}
+
+///|
+fn tensor_tensor_to_shape(t : @math.Tensor) -> Array[Int] {
+  let shape = t.get_shape()
+  if shape.length() != 1 {
+    abort("shape tensor 必须为 1D")
+  }
+  let n = shape[0]
+  let out = Array::make(n, 0)
+  for i = 0; i < n; i = i + 1 {
+    out[i] = t.get([i]).to_int()
+  }
+  out
+}
+
+///|
+fn tensor_flatten_data(t : @math.Tensor) -> Array[Double] {
+  let shape = t.get_shape()
+  let strides = compute_strides(shape)
+  let total = t.total_size()
+  let data = Array::make(total, 0.0)
+  for i = 0; i < total; i = i + 1 {
+    let idx = indices_from_flat(shape, strides, i)
+    data[i] = t.get(idx)
+  }
+  data
+}
+
+///|
+fn tensor_reshape(t : @math.Tensor, shape : Array[Int]) -> @math.Tensor {
+  let mut total = 1
+  for i = 0; i < shape.length(); i = i + 1 {
+    total = total * shape[i]
+  }
+  if total != t.total_size() {
+    abort("reshape 总元素数量不匹配")
+  }
+  @math.Tensor::new(tensor_flatten_data(t), shape)
+}
+
+///|
 fn tensor_scale(t : @math.Tensor, scalar : Double) -> @math.Tensor {
   let shape = t.get_shape()
   let strides = compute_strides(shape)
