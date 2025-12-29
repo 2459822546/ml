@@ -426,19 +426,19 @@ pub fn AutoTensor::batchnorm1d_cached(
   out : @math.Tensor,
   mean : @math.Tensor,
   variance : @math.Tensor,
-  gamma : @math.Tensor,
-  beta : @math.Tensor,
+  gamma : AutoTensor,
+  beta : AutoTensor,
   eps : Double,
   train? : Bool = true,
 ) -> AutoTensor {
   let g = self.graph
   let id = g.batchnorm1d_cached(
     self.id,
+    gamma.id,
+    beta.id,
     out,
     mean,
     variance,
-    gamma,
-    beta,
     eps,
     train~,
   )
@@ -448,12 +448,22 @@ pub fn AutoTensor::batchnorm1d_cached(
 ///|
 pub fn AutoTensor::layernorm(
   self : AutoTensor,
-  gamma : @math.Tensor,
-  beta : @math.Tensor,
+  gamma : AutoTensor,
+  beta : AutoTensor,
   eps : Double,
 ) -> AutoTensor {
   let g = self.graph
-  let id = g.layernorm(self.id, gamma, beta, eps)
+  let id = g.layernorm(self.id, gamma.id, beta.id, eps)
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::embedding(
+  self : AutoTensor,
+  weight : AutoTensor,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.embedding(weight.id, self.value())
   { graph: g, id }
 }
 
