@@ -1859,10 +1859,24 @@ pub fn Sequential::named_parameters(
 }
 
 ///|
+pub fn Sequential::named_parameters_list(
+  self : Sequential,
+) -> Array[(String, Parameter)] {
+  module_named_parameters_list(Sequential(self))
+}
+
+///|
 pub fn Sequential::named_buffers(
   self : Sequential,
 ) -> Map[String, @math.Tensor] {
   module_named_buffers(Sequential(self))
+}
+
+///|
+pub fn Sequential::named_buffers_list(
+  self : Sequential,
+) -> Array[(String, @math.Tensor)] {
+  module_named_buffers_list(Sequential(self))
 }
 
 ///|
@@ -1887,8 +1901,22 @@ pub fn ModuleList::named_parameters(
 }
 
 ///|
+pub fn ModuleList::named_parameters_list(
+  self : ModuleList,
+) -> Array[(String, Parameter)] {
+  module_named_parameters_list(ModuleList(self))
+}
+
+///|
 pub fn ModuleList::named_buffers(
   self : ModuleList,
 ) -> Map[String, @math.Tensor] {
   module_named_buffers(ModuleList(self))
+}
+
+///|
+pub fn ModuleList::named_buffers_list(
+  self : ModuleList,
+) -> Array[(String, @math.Tensor)] {
+  module_named_buffers_list(ModuleList(self))
 }
