@@ -134,6 +134,7 @@ pub struct AdagradParams {
 }
 fn AdagradParams::new(Double, Array[Parameter], eps? : Double) -> Self
 fn AdagradParams::step(Self, Array[Parameter]) -> Unit
+fn AdagradParams::step_seq(Self, Sequential) -> Unit
 
 pub struct Adam {
   mut lr : Double
@@ -160,6 +161,7 @@ pub struct AdamParams {
 }
 fn AdamParams::new(Double, Array[Parameter], beta1? : Double, beta2? : Double, eps? : Double) -> Self
 fn AdamParams::step(Self, Array[Parameter]) -> Unit
+fn AdamParams::step_seq(Self, Sequential) -> Unit
 
 pub struct AdamW {
   mut lr : Double
@@ -188,6 +190,7 @@ pub struct AdamWParams {
 }
 fn AdamWParams::new(Double, Array[Parameter], beta1? : Double, beta2? : Double, eps? : Double, weight_decay? : Double) -> Self
 fn AdamWParams::step(Self, Array[Parameter]) -> Unit
+fn AdamWParams::step_seq(Self, Sequential) -> Unit
 
 pub struct AutoTensor {
   graph : ComputationGraph
@@ -197,8 +200,11 @@ fn AutoTensor::add(Self, Self) -> Self
 fn AutoTensor::add_bias(Self, Self) -> Self
 fn AutoTensor::backward(Self) -> Unit
 fn AutoTensor::backward_with_grad(Self, @math.Tensor) -> Unit
+fn AutoTensor::batchnorm1d_cached(Self, @math.Tensor, @math.Tensor, @math.Tensor, @math.Tensor, @math.Tensor, Double, train? : Bool) -> Self
+fn AutoTensor::dropout(Self, Double, Int, train? : Bool) -> (Self, Int)
 fn AutoTensor::from_other(Self, @math.Tensor, requires_grad? : Bool) -> Self
 fn AutoTensor::grad(Self) -> @math.Tensor
+fn AutoTensor::layernorm(Self, @math.Tensor, @math.Tensor, Double) -> Self
 fn AutoTensor::matmul(Self, Self) -> Self
 fn AutoTensor::mul(Self, Self) -> Self
 fn AutoTensor::new(@math.Tensor, requires_grad? : Bool) -> Self
@@ -219,6 +225,7 @@ pub struct BatchNorm1d {
   eps : Double
 }
 fn BatchNorm1d::forward(Self, @math.Matrix, train? : Bool) -> @math.Matrix
+fn BatchNorm1d::forward_with_cache(Self, @math.Matrix, train? : Bool) -> (@math.Matrix, Array[Double], Array[Double])
 fn BatchNorm1d::new(Int, momentum? : Double, eps? : Double) -> Self
 
 pub struct ComputationGraph {
@@ -229,7 +236,10 @@ fn ComputationGraph::add_bias(Self, Int, Int) -> Int
 fn ComputationGraph::add_input(Self, @math.Tensor, requires_grad? : Bool) -> Int
 fn ComputationGraph::backward(Self, Int) -> Unit
 fn ComputationGraph::backward_with_grad(Self, Int, @math.Tensor) -> Unit
+fn ComputationGraph::batchnorm1d_cached(Self, Int, @math.Tensor, @math.Tensor, @math.Tensor, @math.Tensor, @math.Tensor, Double, train? : Bool) -> Int
+fn ComputationGraph::dropout(Self, Int, Double, Int) -> (Int, Int)
 fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
+fn ComputationGraph::layernorm(Self, Int, @math.Tensor, @math.Tensor, Double) -> Int
 fn ComputationGraph::matmul(Self, Int, Int) -> Int
 fn ComputationGraph::mul(Self, Int, Int) -> Int
 fn ComputationGraph::new() -> Self
@@ -356,6 +366,9 @@ pub struct Node {
   op : Op
   parents : Array[Int]
   requires_grad : Bool
+  aux_tensors : Array[@math.Tensor]
+  aux_scalars : Array[Double]
+  aux_bool : Bool
 }
 
 pub enum Op {
@@ -367,6 +380,9 @@ pub enum Op {
   MatMul
   AddBias
   Sum
+  Dropout
+  BatchNorm1d
+  LayerNorm
 }
 
 pub struct OptimParam {
@@ -418,6 +434,7 @@ pub struct RMSPropParams {
 }
 fn RMSPropParams::new(Double, Array[Parameter], alpha? : Double, eps? : Double) -> Self
 fn RMSPropParams::step(Self, Array[Parameter]) -> Unit
+fn RMSPropParams::step_seq(Self, Sequential) -> Unit
 
 pub struct SGD {
   mut lr : Double
@@ -438,6 +455,7 @@ pub struct SGDParams {
 }
 fn SGDParams::new(Double, Array[Parameter], momentum? : Double, weight_decay? : Double) -> Self
 fn SGDParams::step(Self, Array[Parameter]) -> Unit
+fn SGDParams::step_seq(Self, Sequential) -> Unit
 
 pub struct Sequential {
   modules : Array[Module]
