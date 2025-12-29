@@ -346,3 +346,178 @@ pub fn step_decay(
   let k = epoch / step_size
   lr * @moonbitlang/core/math.pow(factor, k.to_double())
 }
+
+///|
+/// 余弦学习率衰减
+pub fn cosine_decay(
+  lr : Double,
+  min_lr : Double,
+  epoch : Int,
+  max_epoch : Int,
+) -> Double {
+  if max_epoch <= 0 {
+    return lr
+  }
+  let e = if epoch < 0 {
+    0
+  } else if epoch > max_epoch {
+    max_epoch
+  } else {
+    epoch
+  }
+  let t = e.to_double()
+  let t_max = max_epoch.to_double()
+  let pi = 3.141592653589793
+  let cosine = @moonbitlang/core/math.cos(pi * t / t_max)
+  min_lr + 0.5 * (lr - min_lr) * (1.0 + cosine)
+}
+
+///|
+/// 线性 warmup
+pub fn linear_warmup(lr : Double, warmup_steps : Int, step : Int) -> Double {
+  if warmup_steps <= 0 {
+    return lr
+  }
+  if step <= 0 {
+    return 0.0
+  }
+  if step >= warmup_steps {
+    return lr
+  }
+  lr * (step.to_double() / warmup_steps.to_double())
+}
+
+///|
+/// warmup + 余弦衰减
+pub fn warmup_cosine(
+  lr : Double,
+  min_lr : Double,
+  warmup_steps : Int,
+  step : Int,
+  total_steps : Int,
+) -> Double {
+  if total_steps <= 0 {
+    return lr
+  }
+  if step < warmup_steps {
+    return linear_warmup(lr, warmup_steps, step)
+  }
+  let decay_steps = total_steps - warmup_steps
+  if decay_steps <= 0 {
+    return lr
+  }
+  let t = (step - warmup_steps).to_double()
+  let t_max = decay_steps.to_double()
+  let progress = if t > t_max { t_max } else { t }
+  let pi = 3.141592653589793
+  let cosine = @moonbitlang/core/math.cos(pi * progress / t_max)
+  min_lr + 0.5 * (lr - min_lr) * (1.0 + cosine)
+}
+
+///|
+/// 统一 Optimizer 接口
+pub enum Optimizer {
+  SGD(SGD)
+  Adam(Adam)
+  AdamW(AdamW)
+  RMSProp(RMSProp)
+  Adagrad(Adagrad)
+}
+
+///|
+pub fn optimizer_sgd(opt : SGD) -> Optimizer {
+  SGD(opt)
+}
+
+///|
+pub fn optimizer_adam(opt : Adam) -> Optimizer {
+  Adam(opt)
+}
+
+///|
+pub fn optimizer_adamw(opt : AdamW) -> Optimizer {
+  AdamW(opt)
+}
+
+///|
+pub fn optimizer_rmsprop(opt : RMSProp) -> Optimizer {
+  RMSProp(opt)
+}
+
+///|
+pub fn optimizer_adagrad(opt : Adagrad) -> Optimizer {
+  Adagrad(opt)
+}
+
+///|
+pub fn optimizer_step(opt : Optimizer, param : OptimParam) -> Optimizer {
+  match opt {
+    SGD(s) => {
+      let o = s
+      o.step(param)
+      SGD(o)
+    }
+    Adam(a) => {
+      let o = a
+      o.step(param)
+      Adam(o)
+    }
+    AdamW(a) => {
+      let o = a
+      o.step(param)
+      AdamW(o)
+    }
+    RMSProp(r) => {
+      let o = r
+      o.step(param)
+      RMSProp(o)
+    }
+    Adagrad(a) => {
+      let o = a
+      o.step(param)
+      Adagrad(o)
+    }
+  }
+}
+
+///|
+pub fn optimizer_set_lr(opt : Optimizer, lr : Double) -> Optimizer {
+  match opt {
+    SGD(s) => {
+      let o = s
+      o.set_lr(lr)
+      SGD(o)
+    }
+    Adam(a) => {
+      let o = a
+      o.set_lr(lr)
+      Adam(o)
+    }
+    AdamW(a) => {
+      let o = a
+      o.set_lr(lr)
+      AdamW(o)
+    }
+    RMSProp(r) => {
+      let o = r
+      o.set_lr(lr)
+      RMSProp(o)
+    }
+    Adagrad(a) => {
+      let o = a
+      o.set_lr(lr)
+      Adagrad(o)
+    }
+  }
+}
+
+///|
+pub fn optimizer_get_lr(opt : Optimizer) -> Double {
+  match opt {
+    SGD(s) => s.get_lr()
+    Adam(a) => a.get_lr()
+    AdamW(a) => a.get_lr()
+    RMSProp(r) => r.get_lr()
+    Adagrad(a) => a.get_lr()
+  }
+}
