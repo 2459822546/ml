@@ -1274,7 +1274,7 @@ pub fn ComputationGraph::add(self : ComputationGraph, a : Int, b : Int) -> Int {
 pub fn ComputationGraph::sub(self : ComputationGraph, a : Int, b : Int) -> Int {
   let va = self.nodes[a].value
   let vb = self.nodes[b].value
-  let out = tensor_add(va, tensor_neg(vb))
+  let out = tensor_sub(va, vb)
   let grad = tensor_zeros_like(out)
   self.nodes.push({
     value: out,
@@ -1293,7 +1293,7 @@ pub fn ComputationGraph::sub(self : ComputationGraph, a : Int, b : Int) -> Int {
 pub fn ComputationGraph::mul(self : ComputationGraph, a : Int, b : Int) -> Int {
   let va = self.nodes[a].value
   let vb = self.nodes[b].value
-  let out = tensor_hadamard(va, vb)
+  let out = tensor_mul(va, vb)
   let grad = tensor_zeros_like(out)
   self.nodes.push({
     value: out,
