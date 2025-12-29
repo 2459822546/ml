@@ -938,6 +938,9 @@ pub enum Op {
   AvgPool2d
   Flatten2d
   SoftmaxCrossEntropy
+  NLLLoss
+  MSELoss
+  MAELoss
   Reshape
   Transpose
   LogSoftmax

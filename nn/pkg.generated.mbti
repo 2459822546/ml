@@ -248,6 +248,7 @@ fn AutoTensor::backward_with_grad(Self, @math.Tensor) -> Unit
 fn AutoTensor::batchnorm1d_cached(Self, @math.Tensor, @math.Tensor, @math.Tensor, Self, Self, Double, train? : Bool) -> Self
 fn AutoTensor::batchnorm2d_cached(Self, @math.Tensor, @math.Tensor, @math.Tensor, Self, Self, Double, train? : Bool) -> Self
 fn AutoTensor::conv2d(Self, Self, Self, Int, Int) -> Self
+fn AutoTensor::cross_entropy(Self, Array[Int]) -> Self
 fn AutoTensor::dropout(Self, Double, Int, train? : Bool) -> (Self, Int)
 fn AutoTensor::dropout2d(Self, Double, Int, train? : Bool) -> (Self, Int)
 fn AutoTensor::embedding(Self, Self) -> Self
@@ -257,11 +258,14 @@ fn AutoTensor::grad(Self) -> @math.Tensor
 fn AutoTensor::layernorm(Self, Self, Self, Double) -> Self
 fn AutoTensor::log_softmax(Self, axis? : Int) -> Self
 fn AutoTensor::logsumexp(Self, axis? : Int, keepdim? : Bool) -> Self
+fn AutoTensor::mae_loss(Self, Self) -> Self
 fn AutoTensor::matmul(Self, Self) -> Self
 fn AutoTensor::maxpool2d(Self, Int, Int) -> Self
 fn AutoTensor::mean_axis(Self, Int, keepdim? : Bool) -> Self
+fn AutoTensor::mse_loss(Self, Self) -> Self
 fn AutoTensor::mul(Self, Self) -> Self
 fn AutoTensor::new(@math.Tensor, requires_grad? : Bool) -> Self
+fn AutoTensor::nll_loss(Self, Array[Int]) -> Self
 fn AutoTensor::permute(Self, Array[Int]) -> Self
 fn AutoTensor::relu(Self) -> Self
 fn AutoTensor::reshape(Self, Array[Int]) -> Self
@@ -370,11 +374,14 @@ fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
 fn ComputationGraph::layernorm(Self, Int, Int, Int, Double) -> Int
 fn ComputationGraph::log_softmax(Self, Int, Int) -> Int
 fn ComputationGraph::logsumexp(Self, Int, Int, keepdim? : Bool) -> Int
+fn ComputationGraph::mae_loss(Self, Int, Int) -> Int
 fn ComputationGraph::matmul(Self, Int, Int) -> Int
 fn ComputationGraph::maxpool2d(Self, Int, Int, Int) -> Int
 fn ComputationGraph::mean_axis(Self, Int, Int, keepdim? : Bool) -> Int
+fn ComputationGraph::mse_loss(Self, Int, Int) -> Int
 fn ComputationGraph::mul(Self, Int, Int) -> Int
 fn ComputationGraph::new() -> Self
+fn ComputationGraph::nll_loss(Self, Int, Array[Int]) -> Int
 fn ComputationGraph::relu(Self, Int) -> Int
 fn ComputationGraph::reshape(Self, Int, Array[Int]) -> Int
 fn ComputationGraph::softmax_cross_entropy(Self, Int, Array[Int]) -> Int
@@ -629,6 +636,9 @@ pub enum Op {
   AvgPool2d
   Flatten2d
   SoftmaxCrossEntropy
+  NLLLoss
+  MSELoss
+  MAELoss
   Reshape
   Transpose
   LogSoftmax
