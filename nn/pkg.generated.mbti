@@ -55,6 +55,8 @@ fn mae_loss(Array[Double], Array[Double]) -> Double
 
 fn mlp_train_loop(MLP, @data.DataLoader, Int, (MLP, Array[Array[Double]], Array[Double], Int, Int) -> MLP) -> MLP
 
+fn module_avgpool2d(AvgPool2dModule) -> Module
+
 fn module_batchnorm1d(BatchNorm1d) -> Module
 
 fn module_batchnorm2d(BatchNorm2d) -> Module
@@ -71,6 +73,8 @@ fn module_embedding_module(EmbeddingModule) -> Module
 
 fn module_eval(Module) -> Module
 
+fn module_flatten2d(Flatten2dModule) -> Module
+
 fn module_forward(Module, AutoTensor, train? : Bool) -> (AutoTensor, ModuleContext)
 
 fn module_layernorm(LayerNorm) -> Module
@@ -78,6 +82,8 @@ fn module_layernorm(LayerNorm) -> Module
 fn module_linear(LinearModule) -> Module
 
 fn module_load_state_dict(Module, Map[String, @math.Tensor], strict? : Bool, prefix? : String) -> Unit
+
+fn module_maxpool2d(MaxPool2dModule) -> Module
 
 fn module_modulelist(ModuleList) -> Module
 
@@ -114,6 +120,10 @@ fn optimizer_sgd(SGD) -> Optimizer
 fn optimizer_step(Optimizer, OptimParam) -> Optimizer
 
 fn smooth_l1_loss(Array[Double], Array[Double], beta? : Double) -> Double
+
+fn softmax_cross_entropy(Array[Int], @math.Matrix) -> Double
+
+fn softmax_cross_entropy_with_probs(Array[Int], @math.Matrix) -> (Double, @math.Matrix)
 
 fn step_decay(Double, Double, Int, Int) -> Double
 
@@ -210,6 +220,7 @@ pub struct AutoTensor {
 }
 fn AutoTensor::add(Self, Self) -> Self
 fn AutoTensor::add_bias(Self, Self) -> Self
+fn AutoTensor::avgpool2d(Self, Int, Int) -> Self
 fn AutoTensor::backward(Self) -> Unit
 fn AutoTensor::backward_with_grad(Self, @math.Tensor) -> Unit
 fn AutoTensor::batchnorm1d_cached(Self, @math.Tensor, @math.Tensor, @math.Tensor, Self, Self, Double, train? : Bool) -> Self
@@ -218,10 +229,12 @@ fn AutoTensor::conv2d(Self, Self, Self, Int, Int) -> Self
 fn AutoTensor::dropout(Self, Double, Int, train? : Bool) -> (Self, Int)
 fn AutoTensor::dropout2d(Self, Double, Int, train? : Bool) -> (Self, Int)
 fn AutoTensor::embedding(Self, Self) -> Self
+fn AutoTensor::flatten2d(Self) -> Self
 fn AutoTensor::from_other(Self, @math.Tensor, requires_grad? : Bool) -> Self
 fn AutoTensor::grad(Self) -> @math.Tensor
 fn AutoTensor::layernorm(Self, Self, Self, Double) -> Self
 fn AutoTensor::matmul(Self, Self) -> Self
+fn AutoTensor::maxpool2d(Self, Int, Int) -> Self
 fn AutoTensor::mul(Self, Self) -> Self
 fn AutoTensor::new(@math.Tensor, requires_grad? : Bool) -> Self
 fn AutoTensor::relu(Self) -> Self
@@ -231,6 +244,20 @@ fn AutoTensor::value(Self) -> @math.Tensor
 impl Add for AutoTensor
 impl Mul for AutoTensor
 impl Sub for AutoTensor
+
+pub struct AvgPool2d {
+  kernel_size : Int
+  stride : Int
+}
+fn AvgPool2d::forward(Self, @math.Tensor) -> @math.Tensor
+fn AvgPool2d::new(Int, stride? : Int) -> Self
+
+pub struct AvgPool2dModule {
+  kernel_size : Int
+  stride : Int
+}
+fn AvgPool2dModule::forward(Self, AutoTensor) -> AutoTensor
+fn AvgPool2dModule::new(Int, stride? : Int) -> Self
 
 pub struct BatchNorm1d {
   gamma : Array[Double]
@@ -299,6 +326,7 @@ pub struct ComputationGraph {
 fn ComputationGraph::add(Self, Int, Int) -> Int
 fn ComputationGraph::add_bias(Self, Int, Int) -> Int
 fn ComputationGraph::add_input(Self, @math.Tensor, requires_grad? : Bool) -> Int
+fn ComputationGraph::avgpool2d(Self, Int, Int, Int) -> Int
 fn ComputationGraph::backward(Self, Int) -> Unit
 fn ComputationGraph::backward_with_grad(Self, Int, @math.Tensor) -> Unit
 fn ComputationGraph::batchnorm1d_cached(Self, Int, Int, Int, @math.Tensor, @math.Tensor, @math.Tensor, Double, train? : Bool) -> Int
@@ -307,9 +335,11 @@ fn ComputationGraph::conv2d(Self, Int, Int, Int, Int, Int) -> Int
 fn ComputationGraph::dropout(Self, Int, Double, Int) -> (Int, Int)
 fn ComputationGraph::dropout2d(Self, Int, Double, Int) -> (Int, Int)
 fn ComputationGraph::embedding(Self, Int, @math.Tensor) -> Int
+fn ComputationGraph::flatten2d(Self, Int) -> Int
 fn ComputationGraph::grad_of(Self, Int) -> @math.Tensor
 fn ComputationGraph::layernorm(Self, Int, Int, Int, Double) -> Int
 fn ComputationGraph::matmul(Self, Int, Int) -> Int
+fn ComputationGraph::maxpool2d(Self, Int, Int, Int) -> Int
 fn ComputationGraph::mul(Self, Int, Int) -> Int
 fn ComputationGraph::new() -> Self
 fn ComputationGraph::relu(Self, Int) -> Int
@@ -401,6 +431,12 @@ fn EmbeddingModule::new(Int, Int, seed? : Int) -> Self
 fn EmbeddingModule::parameters(Self) -> Array[Parameter]
 fn EmbeddingModule::sync_grads(Self, EmbeddingContext) -> Unit
 
+pub struct Flatten2dModule {
+  dummy : Int
+}
+fn Flatten2dModule::forward(Self, AutoTensor) -> AutoTensor
+fn Flatten2dModule::new() -> Self
+
 pub struct LayerNorm {
   gamma : Array[Double]
   beta : Array[Double]
@@ -468,6 +504,20 @@ fn MLP::mlp_predict_tensor(Self, @math.Tensor) -> Array[Int]
 fn MLP::mlp_set_params(Self, Array[OptimParam]) -> Unit
 fn MLP::new(Int, Array[Int], Int, output_activation? : Activation, seed? : Int) -> Self
 
+pub struct MaxPool2d {
+  kernel_size : Int
+  stride : Int
+}
+fn MaxPool2d::forward(Self, @math.Tensor) -> @math.Tensor
+fn MaxPool2d::new(Int, stride? : Int) -> Self
+
+pub struct MaxPool2dModule {
+  kernel_size : Int
+  stride : Int
+}
+fn MaxPool2dModule::forward(Self, AutoTensor) -> AutoTensor
+fn MaxPool2dModule::new(Int, stride? : Int) -> Self
+
 pub enum Module {
   Linear(LinearModule)
   Relu
@@ -478,6 +528,9 @@ pub enum Module {
   LayerNorm(LayerNormModule)
   Embedding(EmbeddingModule)
   Conv2d(Conv2dModule)
+  MaxPool2d(MaxPool2dModule)
+  AvgPool2d(AvgPool2dModule)
+  Flatten2d(Flatten2dModule)
   Sequential(Sequential)
   ModuleList(ModuleList)
 }
@@ -531,6 +584,9 @@ pub enum Op {
   LayerNorm
   Embedding
   Conv2d
+  MaxPool2d
+  AvgPool2d
+  Flatten2d
 }
 
 pub struct OptimParam {
