@@ -111,6 +111,14 @@ fn Adagrad::new(Double, Int, eps? : Double) -> Self
 fn Adagrad::set_lr(Self, Double) -> Unit
 fn Adagrad::step(Self, OptimParam) -> Unit
 
+pub struct AdagradParams {
+  lr : Double
+  eps : Double
+  h : Array[Array[Double]]
+}
+fn AdagradParams::new(Double, Array[Parameter], eps? : Double) -> Self
+fn AdagradParams::step(Self, Array[Parameter]) -> Unit
+
 pub struct Adam {
   mut lr : Double
   beta1 : Double
@@ -124,6 +132,18 @@ fn Adam::get_lr(Self) -> Double
 fn Adam::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double) -> Self
 fn Adam::set_lr(Self, Double) -> Unit
 fn Adam::step(Self, OptimParam) -> Unit
+
+pub struct AdamParams {
+  lr : Double
+  beta1 : Double
+  beta2 : Double
+  eps : Double
+  m : Array[Array[Double]]
+  v : Array[Array[Double]]
+  mut t : Int
+}
+fn AdamParams::new(Double, Array[Parameter], beta1? : Double, beta2? : Double, eps? : Double) -> Self
+fn AdamParams::step(Self, Array[Parameter]) -> Unit
 
 pub struct AdamW {
   mut lr : Double
@@ -139,6 +159,19 @@ fn AdamW::get_lr(Self) -> Double
 fn AdamW::new(Double, Int, beta1? : Double, beta2? : Double, eps? : Double, weight_decay? : Double) -> Self
 fn AdamW::set_lr(Self, Double) -> Unit
 fn AdamW::step(Self, OptimParam) -> Unit
+
+pub struct AdamWParams {
+  lr : Double
+  beta1 : Double
+  beta2 : Double
+  eps : Double
+  weight_decay : Double
+  m : Array[Array[Double]]
+  v : Array[Array[Double]]
+  mut t : Int
+}
+fn AdamWParams::new(Double, Array[Parameter], beta1? : Double, beta2? : Double, eps? : Double, weight_decay? : Double) -> Self
+fn AdamWParams::step(Self, Array[Parameter]) -> Unit
 
 pub struct AutoTensor {
   graph : ComputationGraph
@@ -336,6 +369,8 @@ fn Parameter::get_grad(Self) -> @math.Tensor
 fn Parameter::new(@math.Tensor, requires_grad? : Bool) -> Self
 fn Parameter::requires_grad(Self) -> Bool
 fn Parameter::set_data(Self, @math.Tensor) -> Unit
+fn Parameter::set_data_inplace(Self, @math.Tensor) -> Unit
+fn Parameter::set_grad(Self, @math.Tensor) -> Unit
 fn Parameter::zero_grad(Self) -> Unit
 
 pub struct RMSProp {
@@ -349,6 +384,15 @@ fn RMSProp::new(Double, Int, alpha? : Double, eps? : Double) -> Self
 fn RMSProp::set_lr(Self, Double) -> Unit
 fn RMSProp::step(Self, OptimParam) -> Unit
 
+pub struct RMSPropParams {
+  lr : Double
+  alpha : Double
+  eps : Double
+  v : Array[Array[Double]]
+}
+fn RMSPropParams::new(Double, Array[Parameter], alpha? : Double, eps? : Double) -> Self
+fn RMSPropParams::step(Self, Array[Parameter]) -> Unit
+
 pub struct SGD {
   mut lr : Double
   momentum : Double
@@ -360,13 +404,25 @@ fn SGD::new(Double, Int, momentum? : Double, weight_decay? : Double) -> Self
 fn SGD::set_lr(Self, Double) -> Unit
 fn SGD::step(Self, OptimParam) -> Unit
 
+pub struct SGDParams {
+  lr : Double
+  momentum : Double
+  weight_decay : Double
+  velocities : Array[Array[Double]]
+}
+fn SGDParams::new(Double, Array[Parameter], momentum? : Double, weight_decay? : Double) -> Self
+fn SGDParams::step(Self, Array[Parameter]) -> Unit
+
 pub struct Sequential {
   modules : Array[Module]
+  mut train : Bool
 }
+fn Sequential::eval(Self) -> Unit
 fn Sequential::forward(Self, AutoTensor) -> (AutoTensor, Array[ModuleContext])
 fn Sequential::new(Array[Module]) -> Self
 fn Sequential::parameters(Self) -> Array[Parameter]
 fn Sequential::sync_grads(Self, Array[ModuleContext]) -> Unit
+fn Sequential::train(Self) -> Unit
 
 // Type aliases
 
