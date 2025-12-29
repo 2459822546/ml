@@ -169,6 +169,34 @@ pub fn MLP::mlp_predict_tensor(self : MLP, x : @math.Tensor) -> Array[Int] {
 }
 
 ///|
+/// 基于 DataLoader 的训练循环（由用户提供更新逻辑）
+pub fn mlp_train_loop(
+  model : MLP,
+  loader : @data.DataLoader,
+  epochs : Int,
+  step : (MLP, Array[Array[Double]], Array[Double], Int, Int) -> MLP,
+) -> MLP {
+  if epochs <= 0 {
+    return model
+  }
+  let mut m = model
+  for epoch = 0; epoch < epochs; epoch = epoch + 1 {
+    loader.reset()
+    let mut batch_idx = 0
+    while true {
+      match loader.next_batch() {
+        Some((features, labels)) => {
+          m = step(m, features, labels, epoch, batch_idx)
+          batch_idx = batch_idx + 1
+        }
+        None => break
+      }
+    }
+  }
+  m
+}
+
+///|
 /// 简化的参数提取：只用于测试或手动更新
 pub fn MLP::mlp_params(self : MLP) -> Array[OptimParam] {
   let params = Array::make(self.layers.length() * 2, OptimParam::new([]))

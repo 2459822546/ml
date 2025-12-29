@@ -145,6 +145,49 @@ test "mlp forward logits" {
 }
 
 ///|
+test "training utils" {
+  let mut p = OptimParam::new([1.0, 2.0])
+  p = p.with_grad([3.0, -4.0])
+  clip_grad_value([p], 2.0)
+  assert_eq(p.grad[0], 2.0)
+  assert_eq(p.grad[1], -2.0)
+  let before = clip_grad_norm([p], 2.5)
+  assert_true((before - 2.828427).abs() < 1.0e-5)
+  let expected = 2.5 / (before + 1.0e-6)
+  assert_true((p.grad[0] - 2.0 * expected).abs() < 1.0e-6)
+  let es = early_stopping_min(2, min_delta=0.01)
+  assert_true(not(es.update(1.0)))
+  assert_true(not(es.update(0.9)))
+  assert_true(not(es.update(0.91)))
+  assert_true(es.update(0.92))
+  let es_max = early_stopping_max(1)
+  assert_true(not(es_max.update(1.0)))
+  assert_true(es_max.update(0.9))
+}
+
+///|
+test "mlp train loop with dataloader" {
+  let features = [[0.0, 0.0], [1.0, 1.0], [1.0, 0.0], [0.0, 1.0]]
+  let labels = [0.0, 1.0, 1.0, 0.0]
+  let ds = @data.Dataset::new(features, labels)
+  let loader = @data.DataLoader::new(ds, batch_size=2, shuffle=false)
+  let mlp = MLP::new(2, [2], 2, output_activation=act_softmax(), seed=3)
+  let trained = mlp_train_loop(mlp, loader, 1, fn(
+    m,
+    batch_x,
+    _batch_y,
+    _epoch,
+    _batch_idx,
+  ) {
+    let x = @math.Matrix::new(batch_x)
+    let _ = m.forward(x)
+    m
+  })
+  let out = trained.forward(@math.Matrix::new([[0.0, 0.0]]))
+  assert_eq(out.shape().1, 2)
+}
+
+///|
 test "tensor forward compat" {
   let lin = Linear::new(2, 2)
   let w = [[1.0, 0.0], [0.0, 1.0]]

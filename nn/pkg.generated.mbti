@@ -2,6 +2,7 @@
 package "2459822546/ml/nn"
 
 import(
+  "2459822546/ml/data"
   "2459822546/ml/math"
 )
 
