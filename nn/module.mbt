@@ -167,6 +167,12 @@ pub fn LinearModule::parameters(self : LinearModule) -> Array[Parameter] {
 pub enum Module {
   Linear(LinearModule)
   Relu
+  Dropout(Dropout)
+  BatchNorm1d(BatchNorm1d)
+  LayerNorm(LayerNorm)
+  Embedding(Embedding)
+  Sequential(Sequential)
+  ModuleList(ModuleList)
 }
 
 ///|
@@ -180,15 +186,47 @@ pub fn module_relu() -> Module {
 }
 
 ///|
+pub fn module_dropout(d : Dropout) -> Module {
+  Dropout(d)
+}
+
+///|
+pub fn module_batchnorm1d(bn : BatchNorm1d) -> Module {
+  BatchNorm1d(bn)
+}
+
+///|
+pub fn module_layernorm(ln : LayerNorm) -> Module {
+  LayerNorm(ln)
+}
+
+///|
+pub fn module_embedding(e : Embedding) -> Module {
+  Embedding(e)
+}
+
+///|
+pub fn module_sequential(s : Sequential) -> Module {
+  Sequential(s)
+}
+
+///|
+pub fn module_modulelist(m : ModuleList) -> Module {
+  ModuleList(m)
+}
+
+///|
 pub enum ModuleContext {
   None
   Linear(LinearContext)
+  Sequential(Array[ModuleContext])
 }
 
 ///|
 pub fn module_forward(
   mod : Module,
   x : AutoTensor,
+  train? : Bool = true,
 ) -> (AutoTensor, ModuleContext) {
   match mod {
     Linear(m) => {
