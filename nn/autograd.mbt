@@ -413,6 +413,92 @@ fn tensor_conv2d(
 }
 
 ///|
+fn tensor_maxpool2d(
+  x : @math.Tensor,
+  kernel : Int,
+  stride : Int,
+) -> (@math.Tensor, @math.Tensor, @math.Tensor) {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("maxpool2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let out_h = (h - kernel) / stride + 1
+  let out_w = (w - kernel) / stride + 1
+  let out = @math.Tensor::zeros([n, c, out_h, out_w])
+  let idx_h = @math.Tensor::zeros([n, c, out_h, out_w])
+  let idx_w = @math.Tensor::zeros([n, c, out_h, out_w])
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      for oh = 0; oh < out_h; oh = oh + 1 {
+        for ow = 0; ow < out_w; ow = ow + 1 {
+          let mut max_v = -@double.infinity
+          let mut max_h = 0
+          let mut max_w = 0
+          for khi = 0; khi < kernel; khi = khi + 1 {
+            for kwi = 0; kwi < kernel; kwi = kwi + 1 {
+              let ih = oh * stride + khi
+              let iw = ow * stride + kwi
+              let v = x.get([ni, ci, ih, iw])
+              if v > max_v {
+                max_v = v
+                max_h = ih
+                max_w = iw
+              }
+            }
+          }
+          out.set([ni, ci, oh, ow], max_v)
+          idx_h.set([ni, ci, oh, ow], max_h.to_double())
+          idx_w.set([ni, ci, oh, ow], max_w.to_double())
+        }
+      }
+    }
+  }
+  (out, idx_h, idx_w)
+}
+
+///|
+fn tensor_avgpool2d(
+  x : @math.Tensor,
+  kernel : Int,
+  stride : Int,
+) -> @math.Tensor {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("avgpool2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let out_h = (h - kernel) / stride + 1
+  let out_w = (w - kernel) / stride + 1
+  let out = @math.Tensor::zeros([n, c, out_h, out_w])
+  let denom = (kernel * kernel).to_double()
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      for oh = 0; oh < out_h; oh = oh + 1 {
+        for ow = 0; ow < out_w; ow = ow + 1 {
+          let mut sum = 0.0
+          for khi = 0; khi < kernel; khi = khi + 1 {
+            for kwi = 0; kwi < kernel; kwi = kwi + 1 {
+              let ih = oh * stride + khi
+              let iw = ow * stride + kwi
+              sum = sum + x.get([ni, ci, ih, iw])
+            }
+          }
+          out.set([ni, ci, oh, ow], sum / denom)
+        }
+      }
+    }
+  }
+  out
+}
+
+///|
 pub enum Op {
   Input
   Add
