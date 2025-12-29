@@ -234,6 +234,63 @@ pub fn module_forward(
       (y, ModuleContext::Linear(ctx))
     }
     Relu => (x.relu(), ModuleContext::None)
+    Dropout(d) => {
+      let mat = x.value().to_matrix()
+      let out = d.forward(mat, train~)
+      (
+        AutoTensor::from_other(
+          x,
+          module_matrix_to_tensor(out),
+          requires_grad=false,
+        ),
+        ModuleContext::None,
+      )
+    }
+    BatchNorm1d(bn) => {
+      let out = bn.forward(x.value().to_matrix(), train~)
+      (
+        AutoTensor::from_other(
+          x,
+          module_matrix_to_tensor(out),
+          requires_grad=false,
+        ),
+        ModuleContext::None,
+      )
+    }
+    LayerNorm(ln) => {
+      let out = ln.forward(x.value().to_matrix())
+      (
+        AutoTensor::from_other(
+          x,
+          module_matrix_to_tensor(out),
+          requires_grad=false,
+        ),
+        ModuleContext::None,
+      )
+    }
+    Embedding(e) => {
+      let v = x.value().to_vector().to_array()
+      let indices = Array::make(v.length(), 0)
+      for i = 0; i < v.length(); i = i + 1 {
+        indices[i] = v[i].to_int()
+      }
+      let out = e.forward(indices)
+      (
+        AutoTensor::from_other(
+          x,
+          module_matrix_to_tensor(out),
+          requires_grad=false,
+        ),
+        ModuleContext::None,
+      )
+    }
+    Sequential(s) => {
+      let seq = s
+      seq.train = train
+      let (y, ctxs) = seq.forward(x)
+      (y, ModuleContext::Sequential(ctxs))
+    }
+    ModuleList(_) => abort("ModuleList 不能直接 forward")
   }
 }
 
