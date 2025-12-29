@@ -33,6 +33,8 @@ fn early_stopping_max(Int, min_delta? : Double) -> EarlyStopping
 
 fn early_stopping_min(Int, min_delta? : Double) -> EarlyStopping
 
+fn eval_step(Sequential, AutoTensor, Array[Int]) -> Double
+
 fn focal_loss_binary(Array[Double], Array[Double], gamma? : Double, alpha? : Double, eps? : Double) -> Double
 
 fn hinge_loss(Array[Double], Array[Double]) -> Double
@@ -144,6 +146,8 @@ fn softmax_cross_entropy(Array[Int], @math.Matrix) -> Double
 fn softmax_cross_entropy_with_probs(Array[Int], @math.Matrix) -> (Double, @math.Matrix)
 
 fn step_decay(Double, Double, Int, Int) -> Double
+
+fn train_step(Sequential, AutoTensor, Array[Int], OptimizerParams) -> (Double, OptimizerParams)
 
 fn warmup_cosine(Double, Double, Int, Int, Int) -> Double
 
