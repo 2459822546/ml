@@ -280,6 +280,12 @@ test "loss forward values" {
   assert_true(kl > 0.0)
   let hinge = hinge_loss([1.0, -1.0], [2.0, -0.5])
   assert_true((hinge - 0.25).abs() < 1.0e-9)
+  let ce2 = softmax_cross_entropy([0], logits)
+  assert_true((ce2 - ce).abs() < 1.0e-9)
+  let (ce3, probs) = softmax_cross_entropy_with_probs([0], logits)
+  assert_true((ce3 - ce).abs() < 1.0e-9)
+  let sum_probs = probs.get(0, 0) + probs.get(0, 1)
+  assert_true((sum_probs - 1.0).abs() < 1.0e-9)
 }
 
 ///|

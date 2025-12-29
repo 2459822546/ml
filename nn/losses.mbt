@@ -231,6 +231,26 @@ pub fn cross_entropy(y_true : Array[Int], logits : @math.Matrix) -> Double {
 }
 
 ///|
+/// Softmax + CrossEntropy 统一接口（基于 logits）
+pub fn softmax_cross_entropy(
+  y_true : Array[Int],
+  logits : @math.Matrix,
+) -> Double {
+  cross_entropy(y_true, logits)
+}
+
+///|
+/// Softmax + CrossEntropy，额外返回概率
+pub fn softmax_cross_entropy_with_probs(
+  y_true : Array[Int],
+  logits : @math.Matrix,
+) -> (Double, @math.Matrix) {
+  let probs = activation_forward(logits, act_softmax())
+  let loss = cross_entropy(y_true, logits)
+  (loss, probs)
+}
+
+///|
 /// 带标签平滑的多分类交叉熵
 pub fn label_smoothing_cross_entropy(
   y_true : Array[Int],
