@@ -219,6 +219,49 @@ fn tensor_dropout(
 }
 
 ///|
+fn tensor_dropout2d(
+  x : @math.Tensor,
+  rate : Double,
+  seed : Int,
+) -> (@math.Tensor, @math.Tensor, Int) {
+  let shape = x.get_shape()
+  if shape.length() != 4 {
+    abort("dropout2d 仅支持 4D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  let h = shape[2]
+  let w = shape[3]
+  let data = Array::make(n * c * h * w, 0.0)
+  let mask = Array::make(n * c * h * w, 0.0)
+  let keep = 1.0 - rate
+  let scale = 1.0 / keep
+  let mut rng = seed
+  let mut idx = 0
+  for ni = 0; ni < n; ni = ni + 1 {
+    for ci = 0; ci < c; ci = ci + 1 {
+      rng = (1103515245 * rng + 12345) & 0x7fffffff
+      let r = rng.to_double() / (0x7fffffff).to_double()
+      let keep_channel = r < keep
+      for hi = 0; hi < h; hi = hi + 1 {
+        for wi = 0; wi < w; wi = wi + 1 {
+          let v = x.get([ni, ci, hi, wi])
+          if keep_channel {
+            data[idx] = v * scale
+            mask[idx] = scale
+          } else {
+            data[idx] = 0.0
+            mask[idx] = 0.0
+          }
+          idx = idx + 1
+        }
+      }
+    }
+  }
+  (@math.Tensor::new(data, shape), @math.Tensor::new(mask, shape), rng)
+}
+
+///|
 fn tensor_layernorm_forward(
   x : @math.Tensor,
   gamma : @math.Tensor,
@@ -420,6 +463,21 @@ pub fn AutoTensor::dropout(
   }
   let g = self.graph
   let (id, new_seed) = g.dropout(self.id, rate, seed)
+  ({ graph: g, id }, new_seed)
+}
+
+///|
+pub fn AutoTensor::dropout2d(
+  self : AutoTensor,
+  rate : Double,
+  seed : Int,
+  train? : Bool = true,
+) -> (AutoTensor, Int) {
+  if not(train) || rate == 0.0 {
+    return (self, seed)
+  }
+  let g = self.graph
+  let (id, new_seed) = g.dropout2d(self.id, rate, seed)
   ({ graph: g, id }, new_seed)
 }
 
@@ -678,6 +736,29 @@ pub fn ComputationGraph::dropout(
 }
 
 ///|
+pub fn ComputationGraph::dropout2d(
+  self : ComputationGraph,
+  x : Int,
+  rate : Double,
+  seed : Int,
+) -> (Int, Int) {
+  let vx = self.nodes[x].value
+  let (out, mask, new_seed) = tensor_dropout2d(vx, rate, seed)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Dropout2d,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [mask],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  (self.nodes.length() - 1, new_seed)
+}
+
+///|
 pub fn ComputationGraph::batchnorm1d_cached(
   self : ComputationGraph,
   x : Int,
@@ -900,6 +981,13 @@ pub fn ComputationGraph::backward_with_grad(
         tensor_add_inplace(self.nodes[p].grad, back)
       }
       Dropout => {
+        let g = node.grad
+        let p = node.parents[0]
+        let mask = node.aux_tensors[0]
+        let back = tensor_hadamard(g, mask)
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      Dropout2d => {
         let g = node.grad
         let p = node.parents[0]
         let mask = node.aux_tensors[0]
