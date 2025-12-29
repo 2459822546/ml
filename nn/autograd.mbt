@@ -405,6 +405,58 @@ pub fn AutoTensor::sum(self : AutoTensor) -> AutoTensor {
 }
 
 ///|
+pub fn AutoTensor::dropout(
+  self : AutoTensor,
+  rate : Double,
+  seed : Int,
+  train? : Bool = true,
+) -> (AutoTensor, Int) {
+  if not(train) || rate == 0.0 {
+    return (self, seed)
+  }
+  let g = self.graph
+  let (id, new_seed) = g.dropout(self.id, rate, seed)
+  ({ graph: g, id }, new_seed)
+}
+
+///|
+pub fn AutoTensor::batchnorm1d_cached(
+  self : AutoTensor,
+  out : @math.Tensor,
+  mean : @math.Tensor,
+  variance : @math.Tensor,
+  gamma : @math.Tensor,
+  beta : @math.Tensor,
+  eps : Double,
+  train? : Bool = true,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.batchnorm1d_cached(
+    self.id,
+    out,
+    mean,
+    variance,
+    gamma,
+    beta,
+    eps,
+    train~,
+  )
+  { graph: g, id }
+}
+
+///|
+pub fn AutoTensor::layernorm(
+  self : AutoTensor,
+  gamma : @math.Tensor,
+  beta : @math.Tensor,
+  eps : Double,
+) -> AutoTensor {
+  let g = self.graph
+  let id = g.layernorm(self.id, gamma, beta, eps)
+  { graph: g, id }
+}
+
+///|
 /// 运算符重载
 pub impl Add for AutoTensor with add(self, other) {
   self.add(other)
@@ -581,6 +633,83 @@ pub fn ComputationGraph::sum(self : ComputationGraph, x : Int) -> Int {
     op: Sum,
     parents: [x],
     requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::dropout(
+  self : ComputationGraph,
+  x : Int,
+  rate : Double,
+  seed : Int,
+) -> (Int, Int) {
+  let vx = self.nodes[x].value
+  let (out, mask, new_seed) = tensor_dropout(vx, rate, seed)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: Dropout,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [mask],
+    aux_scalars: [],
+    aux_bool: false,
+  })
+  (self.nodes.length() - 1, new_seed)
+}
+
+///|
+pub fn ComputationGraph::batchnorm1d_cached(
+  self : ComputationGraph,
+  x : Int,
+  out : @math.Tensor,
+  mean : @math.Tensor,
+  variance : @math.Tensor,
+  gamma : @math.Tensor,
+  beta : @math.Tensor,
+  eps : Double,
+  train? : Bool = true,
+) -> Int {
+  let _ = beta
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: BatchNorm1d,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [mean, variance, gamma],
+    aux_scalars: [eps],
+    aux_bool: train,
+  })
+  self.nodes.length() - 1
+}
+
+///|
+pub fn ComputationGraph::layernorm(
+  self : ComputationGraph,
+  x : Int,
+  gamma : @math.Tensor,
+  beta : @math.Tensor,
+  eps : Double,
+) -> Int {
+  let vx = self.nodes[x].value
+  let (out, mean, variance) = tensor_layernorm_forward(vx, gamma, beta, eps)
+  let grad = tensor_zeros_like(out)
+  self.nodes.push({
+    value: out,
+    grad,
+    op: LayerNorm,
+    parents: [x],
+    requires_grad: true,
+    aux_tensors: [mean, variance, gamma],
+    aux_scalars: [eps],
+    aux_bool: false,
   })
   self.nodes.length() - 1
 }
@@ -714,6 +843,107 @@ pub fn ComputationGraph::backward_with_grad(
         let base = tensor_ones_like(self.nodes[p].value)
         let back = tensor_scale(base, scalar)
         tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      Dropout => {
+        let g = node.grad
+        let p = node.parents[0]
+        let mask = node.aux_tensors[0]
+        let back = tensor_hadamard(g, mask)
+        tensor_add_inplace(self.nodes[p].grad, back)
+      }
+      BatchNorm1d => {
+        let g = node.grad
+        let p = node.parents[0]
+        let x = self.nodes[p].value
+        let shape = x.get_shape()
+        if shape.length() != 2 {
+          abort("batchnorm1d 仅支持 2D 张量")
+        }
+        let n = shape[0]
+        let m = shape[1]
+        let mean = node.aux_tensors[0]
+        let variance = node.aux_tensors[1]
+        let gamma = node.aux_tensors[2]
+        let eps = node.aux_scalars[0]
+        let grad_x = @math.Tensor::zeros([n, m])
+        for j = 0; j < m; j = j + 1 {
+          let mean_j = mean.get([j])
+          let var_j = variance.get([j])
+          let inv_std = 1.0 / (var_j + eps).sqrt()
+          if node.aux_bool {
+            let mut sum_dxhat = 0.0
+            let mut sum_dxhat_xmu = 0.0
+            let mut sum_xmu = 0.0
+            for i = 0; i < n; i = i + 1 {
+              let xmu = x.get([i, j]) - mean_j
+              sum_xmu = sum_xmu + xmu
+              let dxhat = g.get([i, j]) * gamma.get([j])
+              sum_dxhat = sum_dxhat + dxhat
+              sum_dxhat_xmu = sum_dxhat_xmu + dxhat * xmu
+            }
+            let inv_std3 = inv_std * inv_std * inv_std
+            let dvar = sum_dxhat_xmu * -0.5 * inv_std3
+            let dmu = sum_dxhat * -inv_std +
+              dvar * -2.0 * sum_xmu / n.to_double()
+            for i = 0; i < n; i = i + 1 {
+              let xmu = x.get([i, j]) - mean_j
+              let dxhat = g.get([i, j]) * gamma.get([j])
+              let dx = dxhat * inv_std +
+                dvar * 2.0 * xmu / n.to_double() +
+                dmu / n.to_double()
+              grad_x.set([i, j], grad_x.get([i, j]) + dx)
+            }
+          } else {
+            for i = 0; i < n; i = i + 1 {
+              let dx = g.get([i, j]) * gamma.get([j]) * inv_std
+              grad_x.set([i, j], grad_x.get([i, j]) + dx)
+            }
+          }
+        }
+        tensor_add_inplace(self.nodes[p].grad, grad_x)
+      }
+      LayerNorm => {
+        let g = node.grad
+        let p = node.parents[0]
+        let x = self.nodes[p].value
+        let shape = x.get_shape()
+        if shape.length() != 2 {
+          abort("layernorm 仅支持 2D 张量")
+        }
+        let n = shape[0]
+        let m = shape[1]
+        let mean = node.aux_tensors[0]
+        let variance = node.aux_tensors[1]
+        let gamma = node.aux_tensors[2]
+        let eps = node.aux_scalars[0]
+        let grad_x = @math.Tensor::zeros([n, m])
+        for i = 0; i < n; i = i + 1 {
+          let mean_i = mean.get([i])
+          let var_i = variance.get([i])
+          let inv_std = 1.0 / (var_i + eps).sqrt()
+          let mut sum_dxhat = 0.0
+          let mut sum_dxhat_xmu = 0.0
+          let mut sum_xmu = 0.0
+          for j = 0; j < m; j = j + 1 {
+            let xmu = x.get([i, j]) - mean_i
+            sum_xmu = sum_xmu + xmu
+            let dxhat = g.get([i, j]) * gamma.get([j])
+            sum_dxhat = sum_dxhat + dxhat
+            sum_dxhat_xmu = sum_dxhat_xmu + dxhat * xmu
+          }
+          let inv_std3 = inv_std * inv_std * inv_std
+          let dvar = sum_dxhat_xmu * -0.5 * inv_std3
+          let dmu = sum_dxhat * -inv_std + dvar * -2.0 * sum_xmu / m.to_double()
+          for j = 0; j < m; j = j + 1 {
+            let xmu = x.get([i, j]) - mean_i
+            let dxhat = g.get([i, j]) * gamma.get([j])
+            let dx = dxhat * inv_std +
+              dvar * 2.0 * xmu / m.to_double() +
+              dmu / m.to_double()
+            grad_x.set([i, j], grad_x.get([i, j]) + dx)
+          }
+        }
+        tensor_add_inplace(self.nodes[p].grad, grad_x)
       }
     }
   }
