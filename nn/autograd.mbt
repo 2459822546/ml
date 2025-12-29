@@ -499,6 +499,67 @@ fn tensor_avgpool2d(
 }
 
 ///|
+fn tensor_softmax_cross_entropy(
+  logits : @math.Tensor,
+  labels : Array[Int],
+) -> (@math.Tensor, @math.Tensor) {
+  let shape = logits.get_shape()
+  if shape.length() != 2 {
+    abort("softmax_cross_entropy 仅支持 2D 张量")
+  }
+  let n = shape[0]
+  let c = shape[1]
+  if labels.length() != n {
+    abort("标签长度不匹配")
+  }
+  let probs_data = Array::make(n * c, 0.0)
+  let mut loss = 0.0
+  for i = 0; i < n; i = i + 1 {
+    let cls = labels[i]
+    if cls < 0 || cls >= c {
+      abort("类别索引越界")
+    }
+    let mut max_v = logits.get([i, 0])
+    for j = 1; j < c; j = j + 1 {
+      let v = logits.get([i, j])
+      if v > max_v {
+        max_v = v
+      }
+    }
+    let mut sum = 0.0
+    for j = 0; j < c; j = j + 1 {
+      let v = @moonbitlang/core/math.exp(logits.get([i, j]) - max_v)
+      sum = sum + v
+      probs_data[i * c + j] = v
+    }
+    for j = 0; j < c; j = j + 1 {
+      probs_data[i * c + j] = probs_data[i * c + j] / sum
+    }
+    let mut logprob = logits.get([i, cls]) -
+      max_v -
+      @moonbitlang/core/math.ln(sum)
+    if logprob < -1.0e9 {
+      logprob = -1.0e9
+    }
+    if logprob > 1.0e9 {
+      logprob = 1.0e9
+    }
+    loss = loss - logprob
+  }
+  let loss_val = loss / n.to_double()
+  (@math.Tensor::new([loss_val], [1]), @math.Tensor::new(probs_data, [n, c]))
+}
+
+///|
+fn labels_to_tensor(labels : Array[Int]) -> @math.Tensor {
+  let data = Array::make(labels.length(), 0.0)
+  for i = 0; i < labels.length(); i = i + 1 {
+    data[i] = labels[i].to_double()
+  }
+  @math.Tensor::new(data, [labels.length()])
+}
+
+///|
 pub enum Op {
   Input
   Add
