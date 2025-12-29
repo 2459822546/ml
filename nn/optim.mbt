@@ -444,6 +444,11 @@ pub fn SGDParams::step(self : SGDParams, params : Array[Parameter]) -> Unit {
 }
 
 ///|
+pub fn SGDParams::step_seq(self : SGDParams, seq : Sequential) -> Unit {
+  self.step(seq.parameters())
+}
+
+///|
 pub struct AdamParams {
   lr : Double
   beta1 : Double
@@ -508,6 +513,11 @@ pub fn AdamParams::step(self : AdamParams, params : Array[Parameter]) -> Unit {
     }
     params[i].set_data_inplace(data)
   }
+}
+
+///|
+pub fn AdamParams::step_seq(self : AdamParams, seq : Sequential) -> Unit {
+  self.step(seq.parameters())
 }
 
 ///|
@@ -585,6 +595,11 @@ pub fn AdamWParams::step(self : AdamWParams, params : Array[Parameter]) -> Unit 
 }
 
 ///|
+pub fn AdamWParams::step_seq(self : AdamWParams, seq : Sequential) -> Unit {
+  self.step(seq.parameters())
+}
+
+///|
 pub struct RMSPropParams {
   lr : Double
   alpha : Double
@@ -642,6 +657,11 @@ pub fn RMSPropParams::step(
 }
 
 ///|
+pub fn RMSPropParams::step_seq(self : RMSPropParams, seq : Sequential) -> Unit {
+  self.step(seq.parameters())
+}
+
+///|
 pub struct AdagradParams {
   lr : Double
   eps : Double
@@ -691,6 +711,11 @@ pub fn AdagradParams::step(
     }
     params[i].set_data_inplace(data)
   }
+}
+
+///|
+pub fn AdagradParams::step_seq(self : AdagradParams, seq : Sequential) -> Unit {
+  self.step(seq.parameters())
 }
 
 ///|
