@@ -36,6 +36,59 @@ test "layers basic" {
 }
 
 ///|
+test "module parameter autograd" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [1, 2]))
+  let linear = LinearModule::new(2, 1, seed=1)
+  linear.set_params(
+    @math.Tensor::new([1.0, 2.0], [2, 1]),
+    @math.Tensor::new([0.5], [1]),
+  )
+  let (y, ctx) = linear.forward(x)
+  let loss = y.sum()
+  loss.backward()
+  linear.sync_grads(ctx)
+  let params = linear.parameters()
+  let gw = params[0].get_grad()
+  let gb = params[1].get_grad()
+  assert_true((gw.get([0, 0]) - 1.0).abs() < 1.0e-9)
+  assert_true((gw.get([1, 0]) - 2.0).abs() < 1.0e-9)
+  assert_eq(gb.get([0]), 1.0)
+}
+
+///|
+test "sequential module params and forward" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [1, 2]))
+  let linear = LinearModule::new(2, 2, seed=1)
+  linear.set_params(
+    @math.Tensor::new([1.0, 0.0, 0.0, 1.0], [2, 2]),
+    @math.Tensor::new([0.0, 0.0], [2]),
+  )
+  let seq = Sequential::new([module_linear(linear), module_relu()])
+  let (y, ctx) = seq.forward(x)
+  let loss = y.sum()
+  loss.backward()
+  seq.sync_grads(ctx)
+  let params = seq.parameters()
+  assert_eq(params.length(), 2)
+  let gw = params[0].get_grad()
+  assert_true((gw.get([0, 0]) - 1.0).abs() < 1.0e-9)
+}
+
+///|
+test "autotensor operators" {
+  let a = AutoTensor::new(@math.Tensor::from_vector(@math.Vector::new([2.0])))
+  let b = a.from_other(@math.Tensor::from_vector(@math.Vector::new([3.0])))
+  let c = a + b
+  let d = c * b
+  let loss = d.sum()
+  loss.backward()
+  let ga = a.grad()
+  let gb = b.grad()
+  assert_true((ga.get([0]) - 3.0).abs() < 1.0e-9)
+  assert_true((gb.get([0]) - 8.0).abs() < 1.0e-9)
+}
+
+///|
 test "activations basic" {
   let x = @math.Matrix::new([[-1.0, 0.0, 1.0]])
   let relu = activation_forward(x, act_relu())

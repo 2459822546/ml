@@ -55,6 +55,16 @@ fn mae_loss(Array[Double], Array[Double]) -> Double
 
 fn mlp_train_loop(MLP, @data.DataLoader, Int, (MLP, Array[Array[Double]], Array[Double], Int, Int) -> MLP) -> MLP
 
+fn module_forward(Module, AutoTensor) -> (AutoTensor, ModuleContext)
+
+fn module_linear(LinearModule) -> Module
+
+fn module_parameters(Module) -> Array[Parameter]
+
+fn module_relu() -> Module
+
+fn module_sync_grads(Module, ModuleContext) -> Unit
+
 fn mse_loss(Array[Double], Array[Double]) -> Double
 
 fn multilabel_binary_cross_entropy(Array[Array[Double]], Array[Array[Double]], eps? : Double) -> Double
@@ -233,6 +243,23 @@ fn Linear::forward_tensor(Self, @math.Tensor) -> @math.Tensor
 fn Linear::new(Int, Int) -> Self
 fn Linear::set_params(Self, Array[Array[Double]], Array[Double]) -> Unit
 
+pub struct LinearContext {
+  weight : AutoTensor
+  bias : AutoTensor
+}
+
+pub struct LinearModule {
+  weight : Parameter
+  bias : Parameter
+  in_features : Int
+  out_features : Int
+}
+fn LinearModule::forward(Self, AutoTensor) -> (AutoTensor, LinearContext)
+fn LinearModule::new(Int, Int, seed? : Int) -> Self
+fn LinearModule::parameters(Self) -> Array[Parameter]
+fn LinearModule::set_params(Self, @math.Tensor, @math.Tensor) -> Unit
+fn LinearModule::sync_grads(Self, LinearContext) -> Unit
+
 pub struct MLP {
   layers : Array[Linear]
   activations : Array[Activation]
@@ -247,6 +274,22 @@ fn MLP::mlp_predict_proba_tensor(Self, @math.Tensor) -> @math.Tensor
 fn MLP::mlp_predict_tensor(Self, @math.Tensor) -> Array[Int]
 fn MLP::mlp_set_params(Self, Array[OptimParam]) -> Unit
 fn MLP::new(Int, Array[Int], Int, output_activation? : Activation, seed? : Int) -> Self
+
+pub enum Module {
+  Linear(LinearModule)
+  Relu
+}
+
+pub enum ModuleContext {
+  None
+  Linear(LinearContext)
+}
+
+pub struct ModuleList {
+  modules : Array[Module]
+}
+fn ModuleList::new(Array[Module]) -> Self
+fn ModuleList::parameters(Self) -> Array[Parameter]
 
 pub struct Node {
   value : @math.Tensor
@@ -283,6 +326,18 @@ pub enum Optimizer {
   Adagrad(Adagrad)
 }
 
+pub struct Parameter {
+  mut data : @math.Tensor
+  mut grad : @math.Tensor
+  requires_grad : Bool
+}
+fn Parameter::get_data(Self) -> @math.Tensor
+fn Parameter::get_grad(Self) -> @math.Tensor
+fn Parameter::new(@math.Tensor, requires_grad? : Bool) -> Self
+fn Parameter::requires_grad(Self) -> Bool
+fn Parameter::set_data(Self, @math.Tensor) -> Unit
+fn Parameter::zero_grad(Self) -> Unit
+
 pub struct RMSProp {
   mut lr : Double
   alpha : Double
@@ -304,6 +359,14 @@ fn SGD::get_lr(Self) -> Double
 fn SGD::new(Double, Int, momentum? : Double, weight_decay? : Double) -> Self
 fn SGD::set_lr(Self, Double) -> Unit
 fn SGD::step(Self, OptimParam) -> Unit
+
+pub struct Sequential {
+  modules : Array[Module]
+}
+fn Sequential::forward(Self, AutoTensor) -> (AutoTensor, Array[ModuleContext])
+fn Sequential::new(Array[Module]) -> Self
+fn Sequential::parameters(Self) -> Array[Parameter]
+fn Sequential::sync_grads(Self, Array[ModuleContext]) -> Unit
 
 // Type aliases
 
