@@ -140,3 +140,34 @@ pub fn clip_grad_value(params : Array[OptimParam], clip_value : Double) -> Unit 
     }
   }
 }
+
+///|
+/// 标准化训练一步：forward + loss + backward + step
+pub fn train_step(
+  model : Sequential,
+  x : AutoTensor,
+  y_true : Array[Int],
+  opt : OptimizerParams,
+) -> (Double, OptimizerParams) {
+  model.train()
+  let opt2 = optimizer_params_zero_grad(opt)
+  let (logits, ctx) = model.forward(x)
+  let loss = logits.softmax_cross_entropy(y_true)
+  loss.backward()
+  model.sync_grads(ctx)
+  let opt3 = optimizer_params_step(opt2)
+  (loss.value().get([0]), opt3)
+}
+
+///|
+/// 标准化评估一步：forward + loss
+pub fn eval_step(
+  model : Sequential,
+  x : AutoTensor,
+  y_true : Array[Int],
+) -> Double {
+  model.eval()
+  let (logits, _ctx) = model.forward(x)
+  let loss = logits.softmax_cross_entropy(y_true)
+  loss.value().get([0])
+}
