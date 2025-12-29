@@ -276,6 +276,9 @@ pub enum Op {
   MatMul
   AddBias
   Sum
+  Dropout
+  BatchNorm1d
+  LayerNorm
 }
 
 ///|
@@ -285,6 +288,9 @@ pub struct Node {
   op : Op
   parents : Array[Int]
   requires_grad : Bool
+  aux_tensors : Array[@math.Tensor]
+  aux_scalars : Array[Double]
+  aux_bool : Bool
 }
 
 ///|
@@ -421,7 +427,16 @@ pub fn ComputationGraph::add_input(
   requires_grad? : Bool = true,
 ) -> Int {
   let grad = tensor_zeros_like(value)
-  self.nodes.push({ value, grad, op: Input, parents: [], requires_grad })
+  self.nodes.push({
+    value,
+    grad,
+    op: Input,
+    parents: [],
+    requires_grad,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
+  })
   self.nodes.length() - 1
 }
 
@@ -437,6 +452,9 @@ pub fn ComputationGraph::add(self : ComputationGraph, a : Int, b : Int) -> Int {
     op: Add,
     parents: [a, b],
     requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
   })
   self.nodes.length() - 1
 }
@@ -453,6 +471,9 @@ pub fn ComputationGraph::sub(self : ComputationGraph, a : Int, b : Int) -> Int {
     op: Sub,
     parents: [a, b],
     requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
   })
   self.nodes.length() - 1
 }
@@ -469,6 +490,9 @@ pub fn ComputationGraph::mul(self : ComputationGraph, a : Int, b : Int) -> Int {
     op: Mul,
     parents: [a, b],
     requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
   })
   self.nodes.length() - 1
 }
@@ -493,6 +517,9 @@ pub fn ComputationGraph::relu(self : ComputationGraph, a : Int) -> Int {
     op: Relu,
     parents: [a],
     requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
   })
   self.nodes.length() - 1
 }
@@ -513,6 +540,9 @@ pub fn ComputationGraph::matmul(
     op: MatMul,
     parents: [a, b],
     requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
   })
   self.nodes.length() - 1
 }
@@ -533,6 +563,9 @@ pub fn ComputationGraph::add_bias(
     op: AddBias,
     parents: [x, bias],
     requires_grad: true,
+    aux_tensors: [],
+    aux_scalars: [],
+    aux_bool: false,
   })
   self.nodes.length() - 1
 }
