@@ -128,27 +128,88 @@ pub fn Tensor::set(self : Tensor, indices : Array[Int], value : Double) -> Unit 
 ///|
 /// 张量加法
 pub fn Tensor::op_add(self : Tensor, other : Tensor) -> Tensor {
-  if not(self.shapes_equal(other)) {
-    abort("张量形状不匹配")
+  let out_shape = broadcast_shape(self.shape, other.shape)
+  let out_strides = compute_strides_for_shape(out_shape)
+  let mut out_size = 1
+  for i = 0; i < out_shape.length(); i = i + 1 {
+    out_size = out_size * out_shape[i]
   }
-  let result_data = Array::make(self.size, 0.0)
-  for i = 0; i < self.size; i = i + 1 {
-    result_data[i] = self.data[i] + other.data[i]
+  let result_data = Array::make(out_size, 0.0)
+  for i = 0; i < out_size; i = i + 1 {
+    let out_indices = indices_from_flat(out_shape, out_strides, i)
+    let idx_a = broadcast_index(
+      out_indices,
+      out_shape,
+      self.shape,
+      self.strides,
+    )
+    let idx_b = broadcast_index(
+      out_indices,
+      out_shape,
+      other.shape,
+      other.strides,
+    )
+    result_data[i] = self.data[idx_a] + other.data[idx_b]
   }
-  Tensor::new(result_data, self.shape)
+  Tensor::new(result_data, out_shape)
 }
 
 ///|
 /// 张量减法
 pub fn Tensor::op_sub(self : Tensor, other : Tensor) -> Tensor {
-  if not(self.shapes_equal(other)) {
-    abort("张量形状不匹配")
+  let out_shape = broadcast_shape(self.shape, other.shape)
+  let out_strides = compute_strides_for_shape(out_shape)
+  let mut out_size = 1
+  for i = 0; i < out_shape.length(); i = i + 1 {
+    out_size = out_size * out_shape[i]
   }
-  let result_data = Array::make(self.size, 0.0)
-  for i = 0; i < self.size; i = i + 1 {
-    result_data[i] = self.data[i] - other.data[i]
+  let result_data = Array::make(out_size, 0.0)
+  for i = 0; i < out_size; i = i + 1 {
+    let out_indices = indices_from_flat(out_shape, out_strides, i)
+    let idx_a = broadcast_index(
+      out_indices,
+      out_shape,
+      self.shape,
+      self.strides,
+    )
+    let idx_b = broadcast_index(
+      out_indices,
+      out_shape,
+      other.shape,
+      other.strides,
+    )
+    result_data[i] = self.data[idx_a] - other.data[idx_b]
   }
-  Tensor::new(result_data, self.shape)
+  Tensor::new(result_data, out_shape)
+}
+
+///|
+/// 张量除法
+pub fn Tensor::op_div(self : Tensor, other : Tensor) -> Tensor {
+  let out_shape = broadcast_shape(self.shape, other.shape)
+  let out_strides = compute_strides_for_shape(out_shape)
+  let mut out_size = 1
+  for i = 0; i < out_shape.length(); i = i + 1 {
+    out_size = out_size * out_shape[i]
+  }
+  let result_data = Array::make(out_size, 0.0)
+  for i = 0; i < out_size; i = i + 1 {
+    let out_indices = indices_from_flat(out_shape, out_strides, i)
+    let idx_a = broadcast_index(
+      out_indices,
+      out_shape,
+      self.shape,
+      self.strides,
+    )
+    let idx_b = broadcast_index(
+      out_indices,
+      out_shape,
+      other.shape,
+      other.strides,
+    )
+    result_data[i] = self.data[idx_a] / other.data[idx_b]
+  }
+  Tensor::new(result_data, out_shape)
 }
 
 ///|
@@ -164,14 +225,30 @@ pub fn Tensor::scalar_mul(self : Tensor, scalar : Double) -> Tensor {
 ///|
 /// 元素级乘法 (Hadamard product) - 用于 * 运算符
 pub fn Tensor::op_mul(self : Tensor, other : Tensor) -> Tensor {
-  if not(self.shapes_equal(other)) {
-    abort("张量形状不匹配")
+  let out_shape = broadcast_shape(self.shape, other.shape)
+  let out_strides = compute_strides_for_shape(out_shape)
+  let mut out_size = 1
+  for i = 0; i < out_shape.length(); i = i + 1 {
+    out_size = out_size * out_shape[i]
   }
-  let result_data = Array::make(self.size, 0.0)
-  for i = 0; i < self.size; i = i + 1 {
-    result_data[i] = self.data[i] * other.data[i]
+  let result_data = Array::make(out_size, 0.0)
+  for i = 0; i < out_size; i = i + 1 {
+    let out_indices = indices_from_flat(out_shape, out_strides, i)
+    let idx_a = broadcast_index(
+      out_indices,
+      out_shape,
+      self.shape,
+      self.strides,
+    )
+    let idx_b = broadcast_index(
+      out_indices,
+      out_shape,
+      other.shape,
+      other.strides,
+    )
+    result_data[i] = self.data[idx_a] * other.data[idx_b]
   }
-  Tensor::new(result_data, self.shape)
+  Tensor::new(result_data, out_shape)
 }
 
 ///|
@@ -196,6 +273,12 @@ pub impl Sub for Tensor with sub(self, other) {
 /// 实现 Mul trait 以支持 * 运算符（元素级乘法）
 pub impl Mul for Tensor with mul(self, other) {
   self.op_mul(other)
+}
+
+///|
+/// 实现 Div trait 以支持 / 运算符（元素级除法）
+pub impl Div for Tensor with div(self, other) {
+  self.op_div(other)
 }
 
 ///| 形状操作
