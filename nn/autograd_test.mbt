@@ -57,6 +57,28 @@ test "autotensor style gradients" {
 }
 
 ///|
+test "no_grad and inference_mode disable graph" {
+  let x = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [2]))
+  let state : NoGradGuard = no_grad_enter()
+  let y = x.mul(x)
+  no_grad_exit(state)
+  let loss = y.sum()
+  loss.backward()
+  let g = x.grad()
+  assert_true(g.get([0]).abs() < 1.0e-9)
+  assert_true(g.get([1]).abs() < 1.0e-9)
+  let x2 = AutoTensor::new(@math.Tensor::new([1.0, 2.0], [2]))
+  let state2 : InferenceModeGuard = inference_mode_enter()
+  let y2 = x2.add(x2)
+  inference_mode_exit(state2)
+  let loss2 = y2.sum()
+  loss2.backward()
+  let g2 = x2.grad()
+  assert_true(g2.get([0]).abs() < 1.0e-9)
+  assert_true(g2.get([1]).abs() < 1.0e-9)
+}
+
+///|
 test "dropout backward uses mask" {
   let x = AutoTensor::new(@math.Tensor::new([1.0, 1.0, 1.0, 1.0], [2, 2]))
   let (y, _seed) = x.dropout(0.5, 7, train=true)

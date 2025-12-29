@@ -41,6 +41,12 @@ fn hinge_loss(Array[Double], Array[Double]) -> Double
 
 fn huber_loss(Array[Double], Array[Double], delta? : Double) -> Double
 
+fn inference_mode_enter() -> InferenceModeGuard
+
+fn inference_mode_exit(InferenceModeGuard) -> Unit
+
+fn is_grad_enabled() -> Bool
+
 fn kl_divergence(Array[Double], Array[Double]) -> Double
 
 fn l1_penalty(Array[Double], Double) -> Double
@@ -108,6 +114,10 @@ fn module_train(Module) -> Module
 fn mse_loss(Array[Double], Array[Double]) -> Double
 
 fn multilabel_binary_cross_entropy(Array[Array[Double]], Array[Array[Double]], eps? : Double) -> Double
+
+fn no_grad_enter() -> NoGradGuard
+
+fn no_grad_exit(NoGradGuard) -> Unit
 
 fn optimizer_adagrad(Adagrad) -> Optimizer
 
@@ -481,6 +491,10 @@ pub struct Flatten2dModule {
 fn Flatten2dModule::forward(Self, AutoTensor) -> AutoTensor
 fn Flatten2dModule::new() -> Self
 
+pub struct InferenceModeGuard {
+  prev : Bool
+}
+
 pub struct LayerNorm {
   gamma : Array[Double]
   beta : Array[Double]
@@ -602,6 +616,10 @@ fn ModuleList::new(Array[Module]) -> Self
 fn ModuleList::parameters(Self) -> Array[Parameter]
 fn ModuleList::state_dict(Self) -> Map[String, @math.Tensor]
 fn ModuleList::train(Self) -> Unit
+
+pub struct NoGradGuard {
+  prev : Bool
+}
 
 pub struct Node {
   value : @math.Tensor

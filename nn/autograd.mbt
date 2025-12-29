@@ -2,6 +2,56 @@
 /// 简易计算图（Tensor 前向 + 反向传播）
 
 ///|
+let no_grad_flag : Ref[Bool] = @ref.new(false)
+
+///|
+let inference_mode_flag : Ref[Bool] = @ref.new(false)
+
+///|
+fn grad_enabled() -> Bool {
+  not(no_grad_flag.val) && not(inference_mode_flag.val)
+}
+
+///|
+pub struct NoGradGuard {
+  prev : Bool
+}
+
+///|
+pub fn no_grad_enter() -> NoGradGuard {
+  let prev = no_grad_flag.val
+  no_grad_flag.val = true
+  { prev, }
+}
+
+///|
+pub fn no_grad_exit(state : NoGradGuard) -> Unit {
+  no_grad_flag.val = state.prev
+}
+
+///|
+pub struct InferenceModeGuard {
+  prev : Bool
+}
+
+///|
+pub fn inference_mode_enter() -> InferenceModeGuard {
+  let prev = inference_mode_flag.val
+  inference_mode_flag.val = true
+  { prev, }
+}
+
+///|
+pub fn inference_mode_exit(state : InferenceModeGuard) -> Unit {
+  inference_mode_flag.val = state.prev
+}
+
+///|
+pub fn is_grad_enabled() -> Bool {
+  grad_enabled()
+}
+
+///|
 fn compute_strides(shape : Array[Int]) -> Array[Int] {
   let strides = Array::make(shape.length(), 0)
   let mut stride = 1
